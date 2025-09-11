@@ -92,19 +92,68 @@ Los votos de usuarios fueron comparados con evaluaciones de expertos y juicios a
 - **Comparaciones binarias:** cada batalla enfrenta solo **dos modelos a la vez**, lo cual simplifica el proceso de votación, pero limita la posibilidad de comparar simultáneamente múltiples respuestas. Para propósitos de investigación esto es útil (permite estimar rankings relativos con modelos estadísticos como *Bradley-Terry*), pero desde la perspectiva de la experiencia de usuario no refleja un escenario donde uno podría elegir entre varias alternativas al mismo tiempo.
 - **Selección de modelos a enfrentar:** los pares se eligen con un algoritmo de **muestreo activo**, diseñado para mostrar con mayor frecuencia modelos de rendimiento cercano. Esto acelera la convergencia de los rankings y hace más eficiente la recolección de datos, aunque restringe la cobertura de comparaciones posibles entre todos los modelos.
 
-## Análisis inicial del problema y de los datos disponibles  
+## Análisis inicial del problema y de los datos disponibles
 
-## Preprocesamiento de datos  
+El dataset de **LMSYS - Chatbot Arena** contiene **57,250 observaciones** en train y unas **25,000 en test**. Cada registro representa un duelo entre dos modelos de lenguaje (A vs. B) sobre un mismo *prompt*. Las variables incluyen identificadores, textos de entrada (prompt, response_a, response_b) y salidas binarias que indican la preferencia del juez (ganó A, ganó B, empate). Además, se listan los nombres de los modelos, aunque sólo en train. La naturaleza de los datos es mixta: **categórica** (model_a, model_b), **texto libre** (prompt y respuestas) y **binaria** (etiquetas de ganador).
 
-Describir y documentar las tareas de limpieza realizadas.  
+## Preprocesamiento de datos
 
-## Análisis exploratorio de datos (EDA)  
+Se aplicaron varias etapas para limpiar y normalizar el texto:
 
-1. Describir cuántas variables y observaciones hay en el dataset y sus tipos de datos.  
-2. Resumir variables numéricas (medidas de tendencia central y dispersión).  
-3. Elaborar tablas de frecuencia para variables categóricas.  
-4. Realizar cruces entre variables clave para detectar patrones relevantes.  
-5. Generar gráficos exploratorios (histogramas, diagramas de cajas, dispersión, barras, etc.) para facilitar la interpretación.  
+- Conversión de arrays en columnas (`prompt`, `response_a`, `response_b`) a cadenas unificadas.
+- Relleno de valores nulos con cadenas vacías.
+- Normalización de codificación y Unicode para eliminar caracteres corruptos.
+- Desescape de HTML (& -> &).
+- Eliminación de URLs, menciones, hashtags, emojis, símbolos y puntuación redundante.
+- Conversión a minúsculas y reducción de espacios.
+- Remoción de *stopwords* en inglés.
+- Filtrado de filas vacías tras la limpieza.
+
+El resultado fue un dataset con columnas adicionales `prompt_clean`, `response_a_clean`, `response_b_clean` listas para análisis exploratorio.
+
+## Análisis exploratorio de datos (EDA)
+
+1. **Variables y observaciones:**
+
+   - 57,250 filas × 12 columnas tras limpieza.
+   - 64 modelos distintos en `model_a` y `model_b`.
+   - 51,636 prompts únicos, algunos repetidos hasta 101 veces.
+
+2. **Distribuciones y resúmenes:**
+
+   - Los resultados están relativamente balanceados: \~35% victorias modelo A, \~34% modelo B, \~31% empates.
+   - Modelos con más victorias: *gpt-4-1106-preview*, *gpt-4-0613*, *gpt-3.5-turbo-0613*.
+
+3. **Tablas de frecuencia:**
+
+   - Los saludos simples (“hello!”, “sorry, can’t assist”) son respuestas muy frecuentes, lo que puede sesgar la predicción.
+   - `model_a` y `model_b` muestran concentración en pocos modelos de alto rendimiento.
+
+4. **Modelos más fuertes:**
+
+   - Al analizar el número de victorias totales por modelo, se identifican tendencias claras. La Figura 2 muestra los **10 modelos con más victorias acumuladas** en los enfrentamientos.
+   - Destaca **gpt-4-1106-preview** con más de 4,000 victorias, seguido por **gpt-4-0613** y **gpt-3.5-turbo-0613**, ambos con cifras cercanas a 2,400.
+   - Modelos de Anthropic como **Claude-1** y **Claude-2.1** también figuran con un buen número de victorias, aunque en menor proporción que los GPT de OpenAI.
+   - En el grupo medio aparecen modelos abiertos como **LLaMA-2-70B-chat**, lo que indica que, aunque los modelos propietarios dominan, algunos modelos open-source compiten de forma relativamente sólida.
+
+5. **Cruces de variables:**
+
+   - La gráfica de **distribución de resultados en las comparaciones**. Se observa que los conteos son muy similares para victorias de A y B (ambos alrededor de 20,000), mientras que los empates se ubican en torno a 17,500 casos.
+   - Esta representación complementa el gráfico circular, pues muestra en números absolutos cómo están distribuidas las clases. Además, permite identificar que aunque existe balance entre A y B, los empates podrían necesitar un tratamiento especial en modelado debido a su menor frecuencia relativa.
+
+### Visualizaciones del análisis
+
+![Top 10 modelos más fuertes](../../images/top.png)
+
+Muestra los modelos con más victorias acumuladas. Destaca el dominio de variantes de GPT-4 y GPT-3.5, seguidos por modelos de Anthropic y algunos open-source como LLaMA-2.
+
+![Distribución de resultado](../../images/dist_winner.png)
+
+Esto muestra el número absoluto de casos por clase. Refuerza la idea de que las tres categorías están presentes en volúmenes similares, aunque con cierta menor representación de empates.
+
+![Proporción de resultados](../../images/prop_results.png)
+
+Representa en forma de gráfico circular la participación relativa de cada clase (A gana, B gana, Empate).
 
 ## Conclusiones  
 

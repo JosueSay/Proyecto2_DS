@@ -28,7 +28,7 @@
 - **Sesgo de posición:** Tendencia a elegir la primera respuesta por aparecer primero. *Ej.: Muchos votan "A" solo por verla antes que "B".*
 - **Sesgo de verbosidad:** Favorecer respuestas largas aunque no sean mejores. *Ej.: Elegir un texto extenso con relleno frente a uno breve y preciso.*
 - **Sesgo de auto-promoción:** Preferir respuestas que se autopromocionan sin sustento. *Ej.: "Soy el modelo más avanzado, por eso tengo razón".*
-- **Log loss multiclase (calibración):** Penaliza fuerte dar baja probabilidad a la clase verdadera; requiere probabilidades calibradas. *Ej.: Verdad=B, pero P(B)=0.1 y P(A)=0.9 → alto castigo.*
+- **Log loss multiclase (calibración):** Penaliza fuerte dar baja probabilidad a la clase verdadera; requiere probabilidades calibradas. *Ej.: Verdad=B, pero P(B)=0.1 y P(A)=0.9 -> alto castigo.*
 - **Clases objetivo (winner_model_a, winner_model_b, winner_tie):** Etiquetas mutuamente excluyentes; se predicen probabilidades que suman 1. *Ej.: (A: 0.60, B: 0.25, Tie: 0.15).*
 
 ## Análisis previo
@@ -77,7 +77,7 @@
 - **Manejar empates** asignando probabilidad no trivial a "tie" cuando ambas respuestas sean comparables en calidad.
 - Cumplir con evaluación por **log loss multiclase** (enfoque en calibración de probabilidades).
 
-**Hipótesis (texto → preferencia):**
+**Hipótesis (texto -> preferencia):**
 
 1. **Calidad y cobertura**: respuestas que atienden todas las partes del prompt, con precisión y coherencia, aumentan su probabilidad de ser preferidas.
 2. **Estilo y utilidad percibida**: claridad, estructura (listas, pasos), tono adecuado y ausencia de relleno incrementan preferencia frente a textos vagos o redundantes.
@@ -107,7 +107,7 @@
 | Deriva entre train y test           | Cambio en longitudes/temas/idiomas entre splits | Monitorear *drift* con perfiles de datos; ajustar validación agrupada y reportar sensibilidad.        |
 | Distribuciones por prompt repetido  | Leaks por duplicados/near-duplicates            | Deduplicar y agrupar por `prompt` (o hash/cluster) antes de dividir; auditar similitud.               |
 
-## Preguntas
+<!-- ## Preguntas
 
 1. ¿Se prioriza más la interpretabilidad de las predicciones o maximizar el desempeño en log loss multiclase?
 2. ¿Qué nivel de tolerancia se espera hacia la clase "empate": tratarla como clase minoritaria inevitable o enfatizar su predicción precisa?
@@ -115,7 +115,7 @@
 4. ¿La reproducibilidad requiere fijar semillas y versiones exactas, o basta con describir el entorno usado?
 5. ¿Se evaluará la documentación del código (comentarios, claridad) como parte de la nota, o únicamente los resultados numéricos?
 6. ¿Se espera análisis de sesgos y limitaciones en el reporte final, además de las métricas principales?
-7. ¿Qué formato de presentación final se prefiere: resultados comparativos entre modelos o un único mejor modelo justificado?
+7. ¿Qué formato de presentación final se prefiere: resultados comparativos entre modelos o un único mejor modelo justificado? -->
 
 ## Restricciones
 
