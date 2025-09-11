@@ -109,7 +109,7 @@ Se aplicaron varias etapas para limpiar y normalizar el texto:
 - Remoción de *stopwords* en inglés.
 - Filtrado de filas vacías tras la limpieza.
 
-El resultado fue un dataset con columnas adicionales `prompt_clean`, `response_a_clean`, `response_b_clean` listas para análisis exploratorio.
+El resultado fue un dataset con columnas adicionales `prompt_clean`, `response_a_clean`, `response_b_clean`.
 
 ## Análisis exploratorio de datos (EDA)
 
