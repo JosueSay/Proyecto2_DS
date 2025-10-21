@@ -53,7 +53,7 @@
         p.transformers
         p.joblib
         p.torch
-        p.jedi-language-server
+        p.python-lsp-server
         p.spacy
         p.spacy-models.es_core_news_sm
         p.spacy-lookups-data
@@ -61,10 +61,14 @@
         p.spacy-alignments
         p.spacy-transformers
         p.networkx
+        p.sentencepiece
       ]);
     in {
       default = pkgs.mkShell {
-        packages = [python pkgs.black];
+        packages = [
+          python
+          pkgs.black
+        ];
       };
     });
   };
