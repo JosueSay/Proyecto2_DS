@@ -1,0 +1,10 @@
+model_name: roberta-large
+max_len_prompt: 256
+max_len_resp: 250
+lr: 2e-5
+batch_size: 8
+num_epochs: 3
+weight_decay: 0.01
+warmup_ratio: 0.06
+seed: 42
+use_ordinal_tie: true
