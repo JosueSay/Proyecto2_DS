@@ -21,10 +21,11 @@ LOG_FILE = os.path.join(LOG_DIR, "data_summary.log")
 
 def summarizeData(filePath: str) -> str:
     df = pd.read_csv(filePath)
+    n_rows = df.shape[0]
     lines = []
     lines.append(f"\n{'='*80}")
     lines.append(f"NOMBRE ARCHIVO: {os.path.basename(filePath)}")
-    lines.append(f"CANTIDAD FILAS: {df.shape[0]}")
+    lines.append(f"CANTIDAD FILAS: {n_rows}")
     lines.append(f"CANTIDAD COLUMNAS: {df.shape[1]}\n")
     
     lines.append("HEAD (5 filas):")
@@ -33,8 +34,22 @@ def summarizeData(filePath: str) -> str:
     lines.append(str(df.tail(5)))
     lines.append("\nCOLUMNAS Y TIPOS:")
     lines.append(str(df.dtypes))
-    lines.append("\nNAN / NULL / NONE POR COLUMNA:")
-    lines.append(str(df.isnull().sum()))
+    
+    # Conteo de NaN y porcentaje
+    nan_counts = df.isnull().sum()
+    nan_percent = (nan_counts / n_rows * 100).round(2)
+    lines.append("\nNAN / NULL / NONE POR COLUMNA (cantidad y %):")
+    for col in df.columns:
+        lines.append(f"{col}: {nan_counts[col]} ({nan_percent[col]}%)")
+    
+    # Detectar strings vacíos en columnas clean
+    for col in ["prompt_clean", "response_a_clean", "response_b_clean"]:
+        empty_rows = df[df[col].isna() | (df[col].astype(str).str.strip() == "")]
+        if not empty_rows.empty:
+            lines.append(f"\nFilas con NaN o strings vacíos en {col} (hasta 20 filas):")
+            lines.append(str(empty_rows[["id", "model_a", "model_b", col]].head(20)))
+
+    
     lines.append("\nFILAS REPETIDAS:")
     lines.append(str(df.duplicated().sum()))
     lines.append("\nSUMMARY ESTADÍSTICO:")
@@ -44,7 +59,8 @@ def summarizeData(filePath: str) -> str:
 
 def main():
     if cacheManager.exists(CACHE_KEY):
-        return
+        print("CACHE_USED")
+        sys.exit(0)
 
     allLogs = []
     for fileName in FILES_TO_SUMMARIZE:
@@ -58,6 +74,11 @@ def main():
         with open(LOG_FILE, "w", encoding="utf-8") as f:
             f.write("\n".join(allLogs))
         cacheManager.create(CACHE_KEY, content="Data summary generated successfully.")
+        print("DONE")
+        sys.exit(0)
+    else:
+        print("NO_FILES")
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()

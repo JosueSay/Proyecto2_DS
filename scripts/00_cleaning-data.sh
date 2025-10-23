@@ -18,14 +18,16 @@ echo -e "\n${BLUE}${BOLD}🧹 Iniciando limpieza de datos...${RESET}\n"
 echo -e "\t- Data directory:\t${YELLOW}${DATA_DIR}${RESET}"
 echo -e "\t- Script:\t${YELLOW}${SCRIPT_CLEAN}${RESET}\n"
 
-PY_OUTPUT=$(python "${SCRIPT_CLEAN}")
-PY_EXIT_CODE=$?
+# Ejecutar Python y mostrar stdout en tiempo real, además guardarlo en variable
+PY_OUTPUT=$(python -u "${SCRIPT_CLEAN}" 2>&1 | tee /dev/tty)
+PY_EXIT_CODE=${PIPESTATUS[0]}
 
 if [[ $PY_EXIT_CODE -ne 0 ]]; then
     echo -e "\n${RED}❌ Error en limpieza de datos.${RESET}"
     exit 1
 fi
 
+# Verificar salida de Python
 if [[ $PY_OUTPUT == *"CACHE_USED"* ]]; then
     echo -e "\n${YELLOW}ℹ️  Limpieza omitida porque ya se realizó previamente.${RESET}"
 elif [[ $PY_OUTPUT == *"DONE"* ]]; then

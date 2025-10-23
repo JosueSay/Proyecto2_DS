@@ -24,60 +24,71 @@ CACHE_KEY = "CleaningDone"
 # === Funciones de limpieza y preparación ===
 def generateLabel(df: pd.DataFrame) -> pd.DataFrame:
     def mapLabel(row):
-        # Convertir a int por si acaso vienen como string o float
         tie = int(row.get('winner_tie', 0))
         a = int(row.get('winner_model_a', 0))
         b = int(row.get('winner_model_b', 0))
-
-        total = tie + a + b
-
-        if total != 1:
-            # Si es inconsistente, asignamos NaN o saltamos
+        if tie + a + b != 1:
             return pd.NA
-
         if tie == 1:
-            return 2  # Empate -> 2
+            return 2
         elif a == 1:
-            return 0  # Modelo A -> 0
+            return 0
         else:
-            return 1  # Modelo B -> 1
-
+            return 1
     df['label'] = df.apply(mapLabel, axis=1)
-    # Filtrar filas inconsistentes
-    df = df[df['label'].notna()]
-    return df
+    return df[df['label'].notna()]
 
-def evalAndJoin(text: str) -> str:
+def evalAndJoin(text):
+    if pd.isna(text):
+        return pd.NA
+    if isinstance(text, str):
+        t = text.strip().lower()
+        if t in ["nan", "null", "none", ""]:
+            return pd.NA
     try:
-        if not text or text.lower() in ["nan", "null"]:
-            return ""
         arr = eval(text)
-        return "\n".join(arr) if isinstance(arr, list) else str(arr)
+        if isinstance(arr, list):
+            arr = [str(a).strip() for a in arr if str(a).strip().lower() not in ["nan", "null", "none"]]
+            return "\n".join(arr) if arr else pd.NA
+        elif arr is None:
+            return pd.NA
+        else:
+            return str(arr)
     except Exception:
-        return str(text)
+        return str(text).strip() or pd.NA
 
 def cleanText(text: str) -> str:
     if not isinstance(text, str):
-        text = str(text)
+        return None
     text = text.lower()
     text = re.sub(r"(https?://\S+|www\.\S+)", " ", text)
     text = re.sub(r"@\w+", " ", text)
     text = re.sub(r"#\w+", " ", text)
-    text = re.sub(r"[_\*\~\^\(\)\[\]\{\}\|]", " ", text)  # caracteres extra
+    text = re.sub(r"[_\*\~\^\(\)\[\]\{\}\|]", " ", text)
     text = re.sub(r"\.", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-    text = " ".join(w for w in text.split() if w not in STOPWORDS)
-    return text
+    text = " ".join(w for w in text.split() if w not in STOPWORDS).strip()
+    return text if text else None
+
+def removeInvalidChars(text: str) -> str:
+    return text.encode("utf-8", errors="replace").decode("utf-8")
 
 def cleanDataFrame(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.fillna("").astype(str)
     df["prompt_clean"] = df["prompt"].apply(evalAndJoin).apply(cleanText)
     df["response_a_clean"] = df["response_a"].apply(evalAndJoin).apply(cleanText)
     df["response_b_clean"] = df["response_b"].apply(evalAndJoin).apply(cleanText)
+
+    df = df.dropna(subset=["prompt_clean", "response_a_clean", "response_b_clean"]).copy()
+
+    for col in ["prompt_clean", "response_a_clean", "response_b_clean"]:
+        df[col] = df[col].apply(removeInvalidChars)
+
     df = df[
+        (df["prompt_clean"].str.strip() != "") &
         (df["response_a_clean"].str.strip() != "") &
         (df["response_b_clean"].str.strip() != "")
-    ]
+    ].copy()
+
     return df
 
 def createReverseDf(df: pd.DataFrame) -> pd.DataFrame:
@@ -86,10 +97,19 @@ def createReverseDf(df: pd.DataFrame) -> pd.DataFrame:
     dfReverse["label"] = dfReverse["label"].map({0:1, 1:0, 2:2})
     dfReverse["reverse"] = True
     df["reverse"] = False
-    return pd.concat([df, dfReverse], axis=0)
+    dfFull = pd.concat([df, dfReverse], axis=0)
 
-def removeInvalidChars(text: str) -> str:
-    return text.encode("utf-8", errors="replace").decode("utf-8")
+    dfFull = dfFull.dropna(subset=["prompt_clean", "response_a_clean", "response_b_clean"])
+    dfFull = dfFull[
+        (dfFull["prompt_clean"].str.strip() != "") &
+        (dfFull["response_a_clean"].str.strip() != "") &
+        (dfFull["response_b_clean"].str.strip() != "")
+    ].copy()
+
+    for col in ["prompt_clean", "response_a_clean", "response_b_clean"]:
+        dfFull[col] = dfFull[col].apply(removeInvalidChars)
+
+    return dfFull
 
 # === Main ===
 def main():
@@ -115,6 +135,7 @@ def main():
     print("\tGenerando reverses (swap A-B)...")
     dfClean = createReverseDf(dfClean)
     print(f"Registros después de reverse:\t{len(dfClean)}")
+
 
     # Limpiar caracteres inválidos
     for col in ["prompt_clean", "response_a_clean", "response_b_clean"]:
