@@ -1,0 +1,3 @@
+cache_files:
+  CleaningDone: cleaning_done.txt
+  SummaryDone: summary_done.txt
