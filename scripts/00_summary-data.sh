@@ -14,26 +14,22 @@ source "${REPO_DIR}/venv/bin/activate"
 DATA_DIR="${REPO_DIR}/data"
 SCRIPT_SUMMARY="${REPO_DIR}/00_data_cleaning/data_summary.py"
 LOG_FILE="${REPO_DIR}/logs/data_summary.log"
-CACHE_FILE="${REPO_DIR}/cache/summary_done.txt"
 
 echo -e "\n${BLUE}${BOLD}📊 Generando resumen de datos...${RESET}\n"
 echo -e "\t- Data directory:\t${YELLOW}${DATA_DIR}${RESET}"
 echo -e "\t- Script:\t${YELLOW}${SCRIPT_SUMMARY}${RESET}\n"
 
-# Ejecutar script
-python "${SCRIPT_SUMMARY}"
+PY_OUTPUT=$(python "${SCRIPT_SUMMARY}")
 PY_EXIT_CODE=$?
 
-if [[ $PY_EXIT_CODE -eq 0 ]]; then
-    if [[ -f "${CACHE_FILE}" ]]; then
-        echo -e "\n${YELLOW}ℹ️  Resumen ya existía. Se usó log previo: ${YELLOW}${LOG_FILE}${RESET}"
-    elif [[ -f "${LOG_FILE}" ]]; then
-        echo -e "\n${GREEN}✅ Resumen generado con éxito. Log disponible en: ${YELLOW}${LOG_FILE}${RESET}"
-    else
-        echo -e "\n${RED}❌ Error: no se generó el log de resumen.${RESET}"
-        exit 1
-    fi
+if [[ $PY_OUTPUT == *"CACHE_USED"* ]]; then
+    echo -e "\n${YELLOW}ℹ️  Resumen ya existía. Se usó log previo: ${YELLOW}${LOG_FILE}${RESET}"
+elif [[ $PY_OUTPUT == *"DONE"* ]]; then
+    echo -e "\n${GREEN}✅ Resumen generado con éxito. Log disponible en: ${YELLOW}${LOG_FILE}${RESET}"
+elif [[ $PY_EXIT_CODE -ne 0 ]]; then
+    echo -e "\n${RED}❌ Error al generar el resumen de datos.${RESET}"
+    exit 1
 else
-    echo -e "\n${RED}❌ Error al generar el resumen de datos.${RESET}\n"
+    echo -e "\n${RED}❌ Resultado inesperado del script Python.${RESET}"
     exit 1
 fi

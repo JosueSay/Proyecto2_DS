@@ -12,7 +12,7 @@ BOLD="\033[1m"
 # ===== CONFIGURACIÓN =====
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${REPO_DIR}/venv"
-REQ_FILE="${REPO_DIR}/pairranker_deberta/requirements_pairranker.txt"
+REQ_FILE="${REPO_DIR}/01_pair-ranker-deberta/requirements_pairranker.txt"
 
 # ===== INICIO =====
 echo -e "\n${BLUE}${BOLD}🚀 Preparando entorno virtual para PairRanker...${RESET}\n"

@@ -13,7 +13,7 @@ BOLD="\033[1m"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_DIR}/venv/bin/activate"
 
-CFG="${REPO_DIR}/pairranker_deberta/configs/default.yaml"
+CFG="${REPO_DIR}/01_pair-ranker-deberta/configs/default.yaml"
 TRAIN_CSV="${REPO_DIR}/data/train.csv"
 OUT_DIR="${REPO_DIR}/runs/deberta_pairranker"
 
