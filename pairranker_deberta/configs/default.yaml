@@ -8,5 +8,6 @@ weight_decay: 0.01
 warmup_ratio: 0.06
 seed: 42
 use_ordinal_tie: true
-num_workers: 0 # 0 para debug sin multiprocessing
-amp: false
+num_workers: 6
+amp: true
+grad_accum: 1
