@@ -9,7 +9,7 @@ PY_BIN="${VENV_DIR}/bin/python"
 [[ -x "${PY_BIN}" ]] || PY_BIN="$(command -v python3 || command -v python)"
 
 DATA_DIR="${REPO_DIR}/data"
-REPORTS_DIR="${REPO_DIR}/reports/eda"
+REPORTS_DIR="${REPO_DIR}/reports/clean"
 SCRIPT_SUMMARY="${REPO_DIR}/01_data_cleaning/data_summary.py"
 
 echo -e "\n${BLUE}${BOLD}📊 Generando resumen de datos...${RESET}\n"

@@ -10,7 +10,7 @@ from cache_manager import CacheManager
 # rutas base
 project_dir = os.path.join(BASE_DIR, "..")
 clean_dir = os.path.join(project_dir, "data", "clean")
-reports_dir = os.path.join(project_dir, "reports", "eda")
+reports_dir = os.path.join(project_dir, "reports", "clean")
 os.makedirs(reports_dir, exist_ok=True)
 cache_dir = os.path.join(project_dir, "cache")
 os.makedirs(cache_dir, exist_ok=True)
@@ -21,27 +21,55 @@ cache_manager = CacheManager(cache_config, cache_dir)
 CACHE_KEY = "SummaryDone"
 
 def summarizeDf(df: pd.DataFrame) -> dict:
-    # genera resúmenes útiles y retorna dict con dataframes
     dfs = {}
-    # tipos
+
     dtypes_df = pd.DataFrame(df.dtypes, columns=["dtype"]).reset_index().rename(columns={"index": "column"})
     dfs["dtypes"] = dtypes_df
-    # nulos
+
     n = len(df)
     na_counts = df.isna().sum()
     na_percent = (na_counts / max(n, 1) * 100).round(2)
-    na_df = pd.DataFrame({"column": na_counts.index, "na_count": na_counts.values, "na_percent": na_percent.values})
-    dfs["na_overview"] = na_df
-    # primeros/últimos
+    dfs["na_overview"] = pd.DataFrame({
+        "column": na_counts.index,
+        "na_count": na_counts.values,
+        "na_percent": na_percent.values
+    })
+
     dfs["head"] = df.head(10)
     dfs["tail"] = df.tail(10)
-    # describe general
-    dfs["describe"] = df.describe(include="all", datetime_is_numeric=True)
-    # vacíos específicos en columnas limpias
+
+    # compatibilidad pandas (sin datetime_is_numeric)
+    try:
+        dfs["describe"] = df.describe(include="all", datetime_is_numeric=True)
+    except TypeError:
+        dfs["describe"] = df.describe(include="all")
+
+    # resumen numérico explícito (por si la versión es estricta)
+    try:
+        dfs["describe_numeric"] = df.describe(numeric_only=True)
+    except TypeError:
+        num_cols = df.select_dtypes(include=["number"]).columns
+        dfs["describe_numeric"] = df[num_cols].describe() if len(num_cols) else pd.DataFrame()
+
+    # resumen básico de columnas datetime si existen
+    dt_cols = df.select_dtypes(include=["datetime", "datetimetz"]).columns.tolist()
+    if dt_cols:
+        rows = []
+        for c in dt_cols:
+            s = df[c].dropna()
+            rows.append({
+                "column": c,
+                "min": s.min() if not s.empty else None,
+                "max": s.max() if not s.empty else None,
+                "nunique": s.nunique()
+            })
+        dfs["describe_datetime"] = pd.DataFrame(rows)
+
     for col in ["prompt_clean", "response_a_clean", "response_b_clean"]:
         if col in df.columns:
             mask = df[col].isna() | (df[col].astype(str).str.strip() == "")
             dfs[f"empty_{col}"] = df.loc[mask].head(50)
+
     return dfs
 
 def saveReports(dfs: dict):
