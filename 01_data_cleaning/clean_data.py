@@ -29,10 +29,13 @@ CACHE_KEY = "CleaningDone"
 # stopwords
 try:
     import nltk
+    nltk.data.find("corpora/stopwords")
+except LookupError:
     nltk.download("stopwords", quiet=True)
-    STOPWORDS = set(stopwords.words("english"))
-except Exception:
-    STOPWORDS = set()
+
+from nltk.corpus import stopwords
+STOPWORDS = set(stopwords.words("english"))
+
 
 def evalAndJoin(text: str):
     # parsea strings tipo lista y une por salto de línea

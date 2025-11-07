@@ -84,7 +84,7 @@ Este comando invoca internamente el archivo
 Después de la limpieza, se puede generar un informe descriptivo con:
 
 ```bash
-./scripts/02_summary-data.sh
+./scripts/01-2_summary-data.sh
 ```
 
 Este comando ejecuta `01_data_cleaning/data_summary.py`, que produce múltiples reportes
@@ -147,7 +147,7 @@ Después de ejecutar:
 ```bash
 ./scripts/00_setup-environment.sh
 ./scripts/01_cleaning-data.sh
-./scripts/02_summary-data.sh
+./scripts/01-2_summary-data.sh
 ```
 
 se obtiene un conjunto de datos estandarizado y trazable, listo para los módulos de entrenamiento y evaluación posteriores.
