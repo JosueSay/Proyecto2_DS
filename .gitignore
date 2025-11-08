@@ -213,3 +213,5 @@ runs/
 cache/
 logs/
 reports/
+.vscode
+.hf_cache/

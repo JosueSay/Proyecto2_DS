@@ -9,7 +9,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "..", "00_cache-manager"))
-from cache_manager import CacheManager  # noqa: E402
+from cache_manager import CacheManager
 
 # rutas base
 project_dir = os.path.join(BASE_DIR, "..")
@@ -25,7 +25,7 @@ os.makedirs(cache_dir, exist_ok=True)
 # cache
 cache_config = os.path.join(project_dir, "00_cache-manager", "cache_config.yaml")
 cache_manager = CacheManager(cache_config, cache_dir)
-CACHE_KEY = "EdaDone"  # añadir en cache_config.yaml si aún no existe
+CACHE_KEY = "EdaDone"
 
 # paleta y estilo
 PALETTE = {

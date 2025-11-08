@@ -59,6 +59,7 @@ packaging==25.0
 pandas==2.3.3
 pillow==12.0.0
 propcache==0.4.1
+protobuf==4.25.3
 pyarrow==22.0.0
 Pygments==2.19.2
 pyparsing==3.2.5
