@@ -1,37 +1,29 @@
-import os
-import pandas as pd, numpy as np, torch, ast, math, re
+import re
+import ast
+import math
+import pandas as pd
+import torch
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "true")
-USE_SLOW = os.getenv("USE_SLOW_TOKENIZER", "0") == "1"
+from config_loader import loadYamlConfig, getValue
 
-CONTROL_RE   = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
-SURROGATE_RE = re.compile(r"[\ud800-\udfff]")  # U+D800–U+DFFF
+CONTROL_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
+SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 def sanitizeText(s: str) -> str:
+    # limpia caracteres de control y espacios redundantes
+    s = "" if s is None else str(s)
     s = SURROGATE_RE.sub(" ", s)
     s = CONTROL_RE.sub(" ", s)
-    s = s.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    s = s.replace(r"\/", "/")   # evita SyntaxWarning por secuencias escapadas del dataset
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    return re.sub(r"\s+", " ", s).strip()
 
-def maybeJoin(x):
-    """Si viene como string de lista ['a','b'] → 'a\\nb'."""
-    if isinstance(x, str) and x.startswith('[') and x.endswith(']'):
-        try:
-            arr = ast.literal_eval(x)
-            if isinstance(arr, list):
-                return "\n".join(map(str, arr))
-        except Exception:
-            return x
-    return x
-
-def toPyStr(x):
-    """Convierte cualquier cosa a str puro, manejando bytes, None, NaN, listas, etc."""
+def toStrSafe(x):
+    # conversión robusta a str, ignorando nan, bytes o listas serializadas
+    if x is None:
+        return ""
     try:
-        if x is None or (isinstance(x, float) and math.isnan(x)):
+        if isinstance(x, float) and math.isnan(x):
             return ""
         if "pandas" in globals() and pd.isna(x):
             return ""
@@ -42,76 +34,109 @@ def toPyStr(x):
             x = x.decode("utf-8", "ignore")
         except Exception:
             x = x.decode("latin-1", "ignore")
-    x = maybeJoin(x)
-    s = str(x)
-    s = s.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    return s
+    if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
+        try:
+            arr = ast.literal_eval(x)
+            if isinstance(arr, list):
+                x = "\n".join(map(str, arr))
+        except Exception:
+            pass
+    return sanitizeText(x)
+
+def pickColsStrict(df: pd.DataFrame, prompt_col: str, resp_a_col: str, resp_b_col: str):
+    # exige que las columnas existan y estén declaradas en el yaml
+    need = {prompt_col, resp_a_col, resp_b_col, "label"}
+    miss = [c for c in need if c not in df.columns]
+    if miss:
+        raise ValueError(f"faltan columnas requeridas en el csv: {miss}")
+    return prompt_col, resp_a_col, resp_b_col
 
 class PairDataset(Dataset):
-    """
-    Dataset para comparar respuestas A y B con su prompt.
-    Limpieza + coerción a texto; permite forzar tokenizer lento por env.
-    """
-
-    def __init__(self, df: pd.DataFrame, model_name: str, max_len_prompt=256, max_len_resp=700):
+    def __init__(self, df: pd.DataFrame, cfg: dict):
         self.df = df.reset_index(drop=True)
 
-        # Tokenizer fast/slow conmutables por env
-        self.tok_fast = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-        self.tok_slow = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        self.tok = self.tok_slow if USE_SLOW else self.tok_fast
+        # obtiene todos los parámetros desde el yaml (no hay defaults en código)
+        try:
+            pretrained_name = getValue(cfg, "pretrained_name")
+            max_len_prompt = getValue(cfg, "max_len_prompt")
+            max_len_resp = getValue(cfg, "max_len_resp")
+            use_slow_tokenizer = getValue(cfg, "env.use_slow_tokenizer")
+        except KeyError as e:
+            raise KeyError(f"falta en default.yaml: {e}. agregalo al yaml y al validador") from e
 
-        self.maxp, self.maxr = int(max_len_prompt), int(max_len_resp)
-        tok_max = getattr(self.tok, "model_max_length", 512) or 512
-        # +3 por [CLS]/[SEP]/separadores
-        self.seq_max = min(self.maxp + self.maxr + 3, tok_max if tok_max > 0 else 512)
+        try:
+            prompt_col = getValue(cfg, "data.prompt_col")
+            resp_a_col = getValue(cfg, "data.respA_col")
+            resp_b_col = getValue(cfg, "data.respB_col")
+        except KeyError as e:
+            raise KeyError(
+                f"falta en default.yaml: {e}. agrega data.prompt_col, data.respA_col y data.respB_col"
+            ) from e
+
+        self.tok = AutoTokenizer.from_pretrained(pretrained_name, use_fast=not bool(use_slow_tokenizer))
+        self.col_p, self.col_a, self.col_b = pickColsStrict(self.df, prompt_col, resp_a_col, resp_b_col)
+
+        self.maxp = int(max_len_prompt)
+        self.maxr = int(max_len_resp)
+        tok_max = getattr(self.tok, "model_max_length", 512)
+        if not isinstance(tok_max, int) or tok_max <= 0:
+            raise ValueError("tokenizer.model_max_length inválido")
+        self.seq_max = min(self.maxp + self.maxr + 3, tok_max)
+
+        self.has_id = "id" in self.df.columns
+        self.has_swapped = "is_swapped" in self.df.columns
 
     def __len__(self):
         return len(self.df)
 
     def encodePair(self, prompt, resp):
-        text = sanitizeText(toPyStr(prompt))
-        pair = sanitizeText(toPyStr(resp))
-        try:
-            enc = self.tok.encode_plus(
-                text=text,
-                text_pair=pair,
-                truncation=True,
-                max_length=self.seq_max,
-                padding="max_length",
-                return_tensors="pt",
-            )
-        except Exception as e_fast:
-            # Fallback al tokenizer lento
-            try:
-                enc = self.tok_slow.encode_plus(
-                    text=text,
-                    text_pair=pair,
-                    truncation=True,
-                    max_length=self.seq_max,
-                    padding="max_length",
-                    return_tensors="pt",
-                )
-            except Exception as e_slow:
-                rid = None
-                try:
-                    idx = getattr(self, "_last_index", None)
-                    if idx is not None and "id" in self.df.columns:
-                        rid = self.df.iloc[idx]["id"]
-                except Exception:
-                    pass
-                raise TypeError(
-                    f"❌ Tokenización fallida | id={rid} | "
-                    f"types: prompt={type(prompt).__name__}, resp={type(resp).__name__} | "
-                    f"fast_err={e_fast} | slow_err={e_slow}"
-                )
+        enc = self.tok(
+            toStrSafe(prompt),
+            text_pair=toStrSafe(resp),
+            truncation="longest_first",  # evita el error 'only_second'
+            max_length=self.seq_max,     # respeta CLS + SEP + ...
+            padding="max_length",
+            return_tensors="pt",
+        )
         return {k: v.squeeze(0) for k, v in enc.items()}
 
     def __getitem__(self, i):
-        self._last_index = i
         row = self.df.iloc[i]
-        ex1 = self.encodePair(row["prompt"], row["response_a"])
-        ex2 = self.encodePair(row["prompt"], row["response_b"])
-        y = 1 if row.get("winner_model_a", 0) == 1 else 0
-        tie = 1 if row.get("winner_tie", 0) == 1 else 0
-        return ex1, ex2, torch.tensor(y, dtype=torch.float32), torch.tensor(tie, dtype=torch.float32)
+        prompt = "" if pd.isna(row[self.col_p]) else str(row[self.col_p])
+        resp_a = "" if pd.isna(row[self.col_a]) else str(row[self.col_a])
+        resp_b = "" if pd.isna(row[self.col_b]) else str(row[self.col_b])
+
+        encA = self.encodePair(prompt, resp_a)
+        encB = self.encodePair(prompt, resp_b)
+        y = torch.tensor(int(row["label"]), dtype=torch.long)
+        tie_dummy = torch.tensor(0, dtype=torch.long)  # compat
+        return encA, encB, y, tie_dummy
+
+def collateFn(batch):
+    # agrupa lista de (encA, encB, y, tie_dummy) en tensores por batch
+    encA_list, encB_list, y_list, tie_list = zip(*batch)
+
+    def stackDict(lst):
+        keys = lst[0].keys()
+        return {k: torch.stack([ex[k] for ex in lst], dim=0) for k in keys}
+
+    encA = stackDict(encA_list)
+    encB = stackDict(encB_list)
+    y = torch.stack(y_list)
+    tie_dummy = torch.stack(tie_list)
+    return encA, encB, y, tie_dummy
+
+def loadCsv(path: str) -> pd.DataFrame:
+    return pd.read_csv(path)
+
+def loadDatasetFromYaml(yaml_path: str, split: str) -> PairDataset:
+    # carga dataset según rutas declaradas en el yaml
+    cfg = loadYamlConfig(yaml_path)
+    if split not in {"train", "valid", "test"}:
+        raise ValueError("split debe ser 'train', 'valid' o 'test'")
+    try:
+        csv_path = getValue(cfg, f"data.{split}_csv")
+    except KeyError as e:
+        raise KeyError(f"falta en default.yaml: {e}. agrega data.{split}_csv") from e
+    df = loadCsv(csv_path)
+    return PairDataset(df, cfg)
