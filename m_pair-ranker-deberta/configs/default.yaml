@@ -1,35 +1,34 @@
-model_name: deberta-v3-large
-pretrained_name: microsoft/deberta-v3-large
+model_name: deberta-v3-base
+pretrained_name: microsoft/deberta-v3-base
 
-# --- Tokenización ---
-max_len_prompt: 128
-max_len_resp: 352
+# tokenización
+max_len_prompt: 96
+max_len_resp: 288
 
-# --- Entrenamiento ---
-compile: false
+# entrenamiento
 epochs: 6
-batch_size: 16
+batch_size: 8
 grad_accum: 2
-lr: 2e-5
+lr: 4e-5
 weight_decay: 0.01
-warmup_ratio: 0.05
-scheduler: cosine           # o 'linear'
-clip_norm: 1.0
+warmup_ratio: 0.02
+scheduler: cosine
+clip_norm: 2.5
 seed: 42
-amp: bf16                   # 'bf16' | 'fp16' | 'false'
-num_workers: 0
-dropout: 0.2
+amp: "bf16"
+num_workers: 8
+dropout: 0.1
 grad_checkpointing: true
+compile: false
 
-# --- Early Stopping ---
-early_stopping:
-  metric: macro_f1
-  mode: max
-  patience: 2
+# datos
+dataloader:
+  prefetch_factor_train: 6
+  prefetch_factor_val: 6
+  persistent_workers: true
 
-# --- Datos ---
 data:
-  train_csv: data/clean/train_strat.csv
+  train_csv: data/clean/data_clean_aug.csv
   valid_csv: data/clean/valid_strat.csv
   test_csv: data/clean/test_clean.csv
   use_label: true
@@ -37,35 +36,44 @@ data:
   shuffle: true
   val_batch_size: 32
   pin_memory: true
+  prompt_col: prompt_clean
+  respA_col: response_a_clean
+  respB_col: response_b_clean
 
-# --- Pérdida ---
+# pérdida
 loss:
   type: cross_entropy
   label_smoothing: 0.05
 
-# --- Logging/Salidas ---
+# logging / salidas
 logging:
   reports_dir: reports/deberta
-  runs_dir: runs/deberta_pairranker
-  step_csv: train_history.csv
-  epoch_csv: epoch_metrics.csv
+  runs_dir: results/deberta
+  step_csv: steps.csv
+  epoch_csv: epochs.csv
   alerts_csv: alerts.csv
-  confusion_csv: val_confusion.csv
-  class_report_csv: val_class_report.csv
-  preds_sample_csv: val_preds_sample.csv
-  step_interval: 20
+  confusion_csv: confusion.csv
+  class_report_csv: class_report.csv
+  preds_sample_csv: preds.csv
+  step_interval: 200
 
-# --- Monitoreo/Checkpoints ---
+# monitoreo / checkpoints
 monitor:
   detect_collapse: true
   save_best_by: macro_f1
   save_last: true
   verbose: true
 
-# --- Entorno / Tokenizador ---
+# entorno / tokenizador
 env:
   tokenizers_parallelism: true
   cuda_launch_blocking: 0
-  pytorch_cuda_alloc_conf: max_split_size_mb:128
-  hf_home: .hf_cache
-  use_slow_tokenizer: false
+  pytorch_cuda_alloc_conf: "max_split_size_mb:128"
+  hf_home: ".hf_cache"
+  use_slow_tokenizer: true
+
+# early stopping
+early_stopping:
+  metric: macro_f1
+  mode: max
+  patience: 2
