@@ -90,12 +90,12 @@ class PairDataset(Dataset):
         return len(self.df)
 
     def encodePair(self, prompt, resp):
-        enc = self.tok(
-            toStrSafe(prompt),
-            text_pair=toStrSafe(resp),
-            truncation="longest_first",  # evita el error 'only_second'
-            max_length=self.seq_max,     # respeta CLS + SEP + ...
-            padding="max_length",
+        p = self.tok(toStrSafe(prompt), add_special_tokens=False, truncation=True, max_length=self.maxp)
+        r = self.tok(toStrSafe(resp),   add_special_tokens=False, truncation=True, max_length=self.maxr)
+        enc = self.tok.prepare_for_model(
+            p["input_ids"], r["input_ids"],
+            truncation=True, max_length=self.seq_max, padding="max_length",
+            return_overflowing_tokens=False,  # <- clave
             return_tensors="pt",
         )
         return {k: v.squeeze(0) for k, v in enc.items()}
