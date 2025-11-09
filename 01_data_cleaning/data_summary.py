@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import sys
+from core.settings import MAX_LEN_PROMPT, MAX_LEN_RESP, TOTAL_BUDGET
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "..", "00_cache-manager"))
@@ -102,8 +103,8 @@ def runTrainValidSummary():
     truncation_impact.to_csv(os.path.join(reports_dir, "truncation_impact_train_valid.csv"), index=False, encoding="utf-8-sig")
 
     # truncado real con presupuesto
-    trunc_train_real = truncationImpactReal(train, "train", max_len_prompt=96, max_len_resp=288, total_budget=387)
-    trunc_valid_real = truncationImpactReal(valid, "valid", max_len_prompt=96, max_len_resp=288, total_budget=387)
+    trunc_train_real = truncationImpactReal(train, "train", max_len_prompt=MAX_LEN_PROMPT, max_len_resp=MAX_LEN_RESP, total_budget=TOTAL_BUDGET)
+    trunc_valid_real = truncationImpactReal(valid, "valid", max_len_prompt=MAX_LEN_PROMPT, max_len_resp=MAX_LEN_RESP, total_budget=TOTAL_BUDGET)
     truncation_impact_real = pd.concat([trunc_train_real, trunc_valid_real], ignore_index=True)
     truncation_impact_real.to_csv(os.path.join(reports_dir, "truncation_impact_train_valid_real.csv"), index=False, encoding="utf-8-sig")
 

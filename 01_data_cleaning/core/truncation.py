@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+from settings import MAX_LEN_RESP
 
 def estimateTruncation(len_series: pd.Series, max_len: int) -> pd.Series:
     # devuelve True donde la serie excede max_len
@@ -42,7 +43,7 @@ def collapseBulletsAndRepeats(text: str, max_bullets: int = 40) -> str:
     t = re.sub(r"(?:as an ai|i am an ai|language model).*", "", t, flags=re.I)
     return t.strip() or text  # si queda vacío, devolver texto original
 
-def applyTailControl(df: pd.DataFrame, max_len_resp=512, p99_hint: dict = None):
+def applyTailControl(df: pd.DataFrame, max_len_resp=MAX_LEN_RESP, p99_hint: dict = None):
     # extraer percentiles p99 si hay hint
     p99_a = p99_hint.get("respA_len_p99") if p99_hint else None
     p99_b = p99_hint.get("respB_len_p99") if p99_hint else None
@@ -56,7 +57,7 @@ def applyTailControl(df: pd.DataFrame, max_len_resp=512, p99_hint: dict = None):
     need_b = estimateTruncation(b_len, max_len_resp) | (b_len >= (p99_b or b_len.quantile(0.99)))
 
     # truncar donde se necesita
-    df.loc[need_a, "response_a_clean"] = df.loc[need_a, "response_a_clean"].map(lambda t: collapseBulletsAndRepeats(t, 40))
-    df.loc[need_b, "response_b_clean"] = df.loc[need_b, "response_b_clean"].map(lambda t: collapseBulletsAndRepeats(t, 40))
+    df.loc[need_a, "response_a_clean"] = df.loc[need_a, "response_a_clean"].map(lambda t: collapseBulletsAndRepeats(t, 28))
+    df.loc[need_b, "response_b_clean"] = df.loc[need_b, "response_b_clean"].map(lambda t: collapseBulletsAndRepeats(t, 28))
     
     return df
