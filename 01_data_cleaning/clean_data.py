@@ -11,6 +11,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "..", "00_cache-manager"))
 from cache_manager import CacheManager  # noqa: E402
+from sklearn.model_selection import train_test_split
 
 # rutas base
 project_dir = os.path.join(BASE_DIR, "..")
@@ -204,7 +205,6 @@ def runCleaning(input_filename: str = "train.csv"):
 
     # split estratificado
     try:
-        from sklearn.model_selection import train_test_split
         train_df, valid_df = train_test_split(
             df_aug, test_size=0.1, random_state=42, stratify=df_aug["label"]
         )
