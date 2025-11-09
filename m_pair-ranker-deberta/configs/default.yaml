@@ -1,17 +1,17 @@
 model_name: deberta-v3-base
 pretrained_name: microsoft/deberta-v3-base
 
-# longitudes (coherentes con el pipeline)
+# longitudes
 max_len_prompt: 96
-max_len_resp: 288
+max_len_resp: 320
 
 # entrenamiento
 epochs: 6
 batch_size: 8
 grad_accum: 2
-lr: 4e-5
+lr: 2e-5
 weight_decay: 0.01
-warmup_ratio: 0.02
+warmup_ratio: 0.06
 scheduler: cosine
 clip_norm: 2.5
 seed: 42
@@ -42,9 +42,9 @@ data:
 
 # pérdida y regularización
 loss:
-  type: cross_entropy
-  label_smoothing: 0.10
-  class_weights: [1.0, 1.0, 0.85]  # menor peso a TIE
+  type: bt
+  label_smoothing: 0.0
+  class_weights: [1.0, 1.0, 1.0]
 
 # logging / salidas
 logging:
