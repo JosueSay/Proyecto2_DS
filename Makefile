@@ -20,17 +20,22 @@ clean_data:
 	@echo "$(BLUE)$(BOLD)🧹 Ejecutando limpieza de datos...$(RESET)"
 	@echo "\t- Script:       $(YELLOW)$(CLEAN_SCRIPT)$(RESET)"
 	@echo "\t- Contenido:    $(YELLOW)data/clean$(RESET)"
-	@PY_OUTPUT=$$($(PYTHON) -u $(CLEAN_SCRIPT) 2>&1); \
-	PY_EXIT_CODE=$$?; \
+	@TMP=$$(mktemp); \
+	PYTHONPATH=01_data_cleaning/core $(PYTHON) -u $(CLEAN_SCRIPT) > $$TMP 2>&1; \
+	PY_EXIT_CODE=$$?; PY_OUTPUT=$$(cat $$TMP); rm -f $$TMP; \
 	if [ $$PY_EXIT_CODE -ne 0 ]; then \
-		echo "$(RED)❌ Error en limpieza de datos$(RESET)"; exit 1; \
+		echo "$(RED)❌ Error en limpieza de datos$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	elif echo "$$PY_OUTPUT" | grep -q "CACHE_USED"; then \
-		echo "$(YELLOW)ℹ️  Limpieza omitida (cache)$(RESET)\n"; \
+		echo "$(YELLOW)ℹ️  Limpieza omitida (cache)$(RESET)"; echo ""; \
 	elif echo "$$PY_OUTPUT" | grep -q "DONE"; then \
-		echo "$(GREEN)✅ Limpieza completada$(RESET)\n"; \
+		echo "$(GREEN)✅ Limpieza completada$(RESET)"; echo ""; \
 		echo "\tRevisa el contenido generado en: $(YELLOW)data/clean$(RESET)"; \
 	else \
-		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; exit 1; \
+		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	fi
 
 # Generar resumen de datos
