@@ -75,3 +75,23 @@ def infoLen(text: str) -> int:
     if t == "no response":
         return 0
     return len(t.split())  # contar palabras
+
+def splitSentences(text: str) -> list[str]:
+    # split simple por puntuación fuerte y saltos de línea
+    t = str(text or "").strip()
+    t = re.sub(r"\s+", " ", t)
+    parts = re.split(r"(?<=[\.\?\!])\s+|\n+", t)
+    return [p.strip() for p in parts if p and p.strip()]
+
+def tokenCount(text: str) -> int:
+    return len(str(text or "").split())
+
+def stripBoilerplate(text: str) -> str:
+    t = str(text or "")
+    # saludos largos al inicio
+    t = re.sub(r"^\s*(hi|hello|dear|greetings)[\s\.,!\-:]*.{80,300}?(?=\n|$)", "", t, flags=re.I|re.S)
+    # disclaimers IA
+    t = re.sub(r"\b(as an ai|i am an ai|language model)\b.*", "", t, flags=re.I)
+    # firmas y rúbricas genéricas
+    t = re.sub(r"(best regards|kind regards|sincerely|thanks|thank you)[\.,!\-:]*.*$", "", t, flags=re.I)
+    return t.strip()

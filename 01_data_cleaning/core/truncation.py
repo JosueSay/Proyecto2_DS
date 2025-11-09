@@ -1,63 +1,136 @@
 import re
 import pandas as pd
-from settings import MAX_LEN_RESP
+
+from settings import (
+    MAX_LEN_PROMPT, MAX_LEN_RESP, BULLET_CAP,
+    HEAD_TOK, TAIL_TOK, MID_STRIDE, computeRespTarget
+)
+from text_utils import splitSentences, tokenCount, stripBoilerplate
 
 def estimateTruncation(len_series: pd.Series, max_len: int) -> pd.Series:
-    # devuelve True donde la serie excede max_len
     return (len_series > max_len)
 
-def collapseBulletsAndRepeats(text: str, max_bullets: int = 40) -> str:
-    t = str(text or "")  # asegurar que sea string
-    lines = [l for l in t.split("\n")]
-    count = 0
-    out_lines = []
+def collapseBulletsAndRepeats(text: str, max_bullets: int = BULLET_CAP) -> str:
+    t = str(text or "")
+    # limitar bullets
+    lines = t.split("\n")
+    out, seen, count = [], {}, 0
     for l in lines:
-        # contar bullets y limitar a max_bullets
         if re.match(r"^\s*(?:[-\*\•]|\d+\.)\s+", l):
             count += 1
             if count <= max_bullets:
-                out_lines.append(l)
+                out.append(l)
         else:
-            out_lines.append(l)
+            out.append(l)
     if count > max_bullets:
-        out_lines.append("…")  # indicar truncamiento
-    t = "\n".join(out_lines)
+        out.append("…")
+    t = "\n".join(out)
 
-    # separar en chunks por saltos de línea dobles
-    chunks = [c.strip() for c in re.split(r"(\n\s*\n+)", t)]
-    seen = {}
-    new_chunks = []
+    # dedup de bloques repetidos (>2)
+    chunks = [c for c in re.split(r"(\n\s*\n+)", t)]
+    out = []
     for c in chunks:
-        if not c.strip():
-            new_chunks.append(c)
+        k = c.strip().lower()
+        if k and not k.isspace():
+            seen[k] = seen.get(k, 0) + 1
+            if seen[k] <= 2:
+                out.append(c)
+        else:
+            out.append(c)
+    return "".join(out).strip() or text
+
+def headTailTokens(tokens: list, head: int, tail: int) -> list:
+    if len(tokens) <= head + tail:
+        return tokens
+    return tokens[:head] + ["…"] + tokens[-tail:]
+
+def sampleMiddle(tokens: list, target: int, stride: int = MID_STRIDE) -> list:
+    if len(tokens) <= target:
+        return tokens
+    # recorta del centro con muestreo
+    left = tokens[: len(tokens)//2]
+    right = tokens[len(tokens)//2 :]
+    mid = tokens[len(left)-min(64, len(tokens)//4) : len(left)+min(64, len(tokens)//4)]
+    sampled = mid[::max(1, stride)]
+    merged = left[:HEAD_TOK] + ["…"] + sampled + ["…"] + right[-TAIL_TOK:]
+    if len(merged) > target:
+        merged = merged[:target-1] + ["…"]
+    return merged
+
+def compressToTarget(text: str, resp_target: int) -> str:
+    t = stripBoilerplate(str(text or "").strip())
+    if not t:
+        return text
+
+    # si cabe, retorna
+    toks = t.split()
+    if len(toks) <= resp_target:
+        return t
+
+    # head+tail
+    toks = headTailTokens(toks, HEAD_TOK, TAIL_TOK)
+    if len(toks) <= resp_target:
+        return " ".join(toks)
+
+    # muestreo del medio
+    toks = sampleMiddle(toks, resp_target, MID_STRIDE)
+    # dedup de oraciones exactas (>2)
+    sents = splitSentences(" ".join(toks))
+    counts, out = {}, []
+    for s in sents:
+        k = s.strip().lower()
+        if not k:
             continue
-        k = c.lower()
-        seen[k] = seen.get(k, 0) + 1
-        if seen[k] <= 2:  # permitir máximo 2 repeticiones
-            new_chunks.append(c)
-    t = "".join(new_chunks)
+        counts[k] = counts.get(k, 0) + 1
+        if counts[k] <= 2:
+            out.append(s)
+    out_text = " ".join(out).strip()
+    if tokenCount(out_text) > resp_target:
+        out_text = " ".join(out_text.split()[:resp_target-1] + ["…"])
+    return out_text or text
 
-    # quitar saludos largos
-    t = re.sub(r"^(?:hi|hello|dear|greetings)[\s\.,!\-:]*.{150,300}?(?=\n|$)", "", t, flags=re.I|re.S)
-    # quitar menciones de ser IA
-    t = re.sub(r"(?:as an ai|i am an ai|language model).*", "", t, flags=re.I)
-    return t.strip() or text  # si queda vacío, devolver texto original
+def miniHeadTailPrompt(s: str) -> str:
+    toks = str(s or "").split()
+    if len(toks) <= MAX_LEN_PROMPT:
+        return s
+    toks = headTailTokens(toks, HEAD_TOK // 2, TAIL_TOK // 2)
+    return " ".join(toks)
 
-def applyTailControl(df: pd.DataFrame, max_len_resp=MAX_LEN_RESP, p99_hint: dict = None):
-    # extraer percentiles p99 si hay hint
-    p99_a = p99_hint.get("respA_len_p99") if p99_hint else None
-    p99_b = p99_hint.get("respB_len_p99") if p99_hint else None
+def applyTailControl(df: pd.DataFrame, max_len_resp: int = MAX_LEN_RESP, p99_hint: dict | None = None):
+    # longitudes base
+    a_len = df["response_a_clean"].astype(str).str.split().str.len()
+    b_len = df["response_b_clean"].astype(str).str.split().str.len()
+    p_len = df["prompt_clean"].astype(str).str.split().str.len()
 
-    # calcular largo de cada respuesta
-    a_len = df["response_a_clean"].str.split().str.len()
-    b_len = df["response_b_clean"].str.split().str.len()
+    # p99 opcional
+    p99_a = p99_hint.get("respA_len_p99") if p99_hint else a_len.quantile(0.99)
+    p99_b = p99_hint.get("respB_len_p99") if p99_hint else b_len.quantile(0.99)
 
-    # determinar qué filas necesitan truncamiento
-    need_a = estimateTruncation(a_len, max_len_resp) | (a_len >= (p99_a or a_len.quantile(0.99)))
-    need_b = estimateTruncation(b_len, max_len_resp) | (b_len >= (p99_b or b_len.quantile(0.99)))
+    need_a = estimateTruncation(a_len, max_len_resp) | (a_len >= p99_a)
+    need_b = estimateTruncation(b_len, max_len_resp) | (b_len >= p99_b)
 
-    # truncar donde se necesita
-    df.loc[need_a, "response_a_clean"] = df.loc[need_a, "response_a_clean"].map(lambda t: collapseBulletsAndRepeats(t, 28))
-    df.loc[need_b, "response_b_clean"] = df.loc[need_b, "response_b_clean"].map(lambda t: collapseBulletsAndRepeats(t, 28))
-    
+    # objetivo dinámico por fila
+    resp_targets = p_len.map(lambda n: computeRespTarget(int(n)))
+
+    # A
+    if need_a.any():
+        sub = df.loc[need_a, "response_a_clean"].map(lambda t: collapseBulletsAndRepeats(t, BULLET_CAP))
+        sub = sub.map(stripBoilerplate)
+        df.loc[need_a, "response_a_clean"] = [
+            compressToTarget(t, int(resp_targets.loc[idx])) for idx, t in sub.items()
+        ]
+
+    # B
+    if need_b.any():
+        sub = df.loc[need_b, "response_b_clean"].map(lambda t: collapseBulletsAndRepeats(t, BULLET_CAP))
+        sub = sub.map(stripBoilerplate)
+        df.loc[need_b, "response_b_clean"] = [
+            compressToTarget(t, int(resp_targets.loc[idx])) for idx, t in sub.items()
+        ]
+
+    # prompt mini head+tail si excede
+    over_p = p_len > MAX_LEN_PROMPT
+    if over_p.any():
+        df.loc[over_p, "prompt_clean"] = df.loc[over_p, "prompt_clean"].map(miniHeadTailPrompt)
+
     return df
