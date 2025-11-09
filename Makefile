@@ -1,8 +1,8 @@
 PYTHON ?= python3
 CLEAN_SCRIPT = 01_data_cleaning/clean_data.py
 SUMMARY_SCRIPT = 01_data_cleaning/data_summary.py
-EDA_SCRIPT = 02_eda/eda.py
-EDA_ANALYSIS_SCRIPT = 02_eda/eda_analysis.py
+EDA_SCRIPT = 02_eda/eda_orchestrator.py
+EDA_ANALYSIS_SCRIPT = 02_eda/eda_analysis_orchestrator.py
 
 # colores
 BLUE := \033[1;34m
@@ -42,11 +42,14 @@ clean_data:
 summary:
 	@echo "$(BLUE)$(BOLD)📊 Generando resumen de datos...$(RESET)"
 	@echo "\t- Script:       $(YELLOW)$(SUMMARY_SCRIPT)$(RESET)"
-	@echo "\t- Contenido:    $(YELLOW)data/clean$(RESET)"
-	@PY_OUTPUT=$$($(PYTHON) -u $(SUMMARY_SCRIPT) 2>&1); \
-	PY_EXIT_CODE=$$?; \
+	@echo "\t- Contenido:    $(YELLOW)reports/clean$(RESET)"
+	@TMP=$$(mktemp); \
+	PYTHONPATH=01_data_cleaning:01_data_cleaning/summary $(PYTHON) -u $(SUMMARY_SCRIPT) > $$TMP 2>&1; \
+	PY_EXIT_CODE=$$?; PY_OUTPUT=$$(cat $$TMP); rm -f $$TMP; \
 	if [ $$PY_EXIT_CODE -ne 0 ]; then \
-		echo "$(RED)❌ Error al generar el resumen$(RESET)"; exit 1; \
+		echo "$(RED)❌ Error al generar el resumen$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	elif echo "$$PY_OUTPUT" | grep -Eq "CACHE_USED_TRAIN_VALID|CACHE_USED"; then \
 		echo "$(YELLOW)ℹ️  Resumen omitido (cache)$(RESET)\n"; \
 	elif echo "$$PY_OUTPUT" | grep -q "NO_TRAIN_VALID_FILES"; then \
@@ -55,9 +58,11 @@ summary:
 		echo "$(RED)❌ No existe data_clean.csv. Ejecuta primero 'make clean_data'$(RESET)"; exit 1; \
 	elif echo "$$PY_OUTPUT" | grep -Eq "DONE_TRAIN_VALID|DONE"; then \
 		echo "$(GREEN)✅ Resumen generado correctamente$(RESET)\n"; \
-		echo "\tRevisa el contenido generado en: $(YELLOW)reports/eda$(RESET)"; \
+		echo "\tRevisa el contenido generado en: $(YELLOW)reports/clean$(RESET)"; \
 	else \
-		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; exit 1; \
+		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	fi
 
 # EDA general
@@ -65,41 +70,51 @@ eda:
 	@echo "$(BLUE)$(BOLD)📈 Ejecutando EDA 1...$(RESET)"
 	@echo "\t- Script:       $(YELLOW)$(EDA_SCRIPT)$(RESET)"
 	@echo "\t- Contenido:    $(YELLOW)images/eda/*.png y reports/eda$(RESET)"
-	@PY_OUTPUT=$$($(PYTHON) -u $(EDA_SCRIPT) 2>&1); \
-	PY_EXIT_CODE=$$?; \
+	@TMP=$$(mktemp); \
+	PYTHONPATH=02_eda:02_eda/analysis:00_cache-manager $(PYTHON) -u $(EDA_SCRIPT) > $$TMP 2>&1; \
+	PY_EXIT_CODE=$$?; PY_OUTPUT=$$(cat $$TMP); rm -f $$TMP; \
 	if [ $$PY_EXIT_CODE -ne 0 ]; then \
-		echo "$(RED)❌ Error durante EDA$(RESET)"; exit 1; \
+		echo "$(RED)❌ Error durante EDA$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	elif echo "$$PY_OUTPUT" | grep -q "CACHE_USED"; then \
 		echo "$(YELLOW)ℹ️  EDA omitido (cache)$(RESET)\n"; \
 	elif echo "$$PY_OUTPUT" | grep -q "DONE"; then \
 		echo "$(GREEN)✅ EDA completado$(RESET)\n"; \
 		echo "\tRevisa el contenido generado en: $(YELLOW)images/eda/*.png y reports/eda$(RESET)"; \
 	else \
-		echo "$(RED)❌ Salida inesperada del script EDA$(RESET)"; exit 1; \
+		echo "$(RED)❌ Salida inesperada del script EDA$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	fi
 
 # Análisis EDA detallado
 eda_analysis:
 	@echo "$(BLUE)$(BOLD)📊 Ejecutando análisis EDA 2...$(RESET)"
 	@echo "\t- Script: $(YELLOW)$(EDA_ANALYSIS_SCRIPT)$(RESET)"
-	@echo "\t- Log:    $(YELLOW)reports/clean/00_analisis.log$(RESET)"
-	@PY_OUTPUT=$$($(PYTHON) -u $(EDA_ANALYSIS_SCRIPT) 2>&1); \
-	PY_EXIT_CODE=$$?; \
+	@echo "\t- Log:    $(YELLOW)reports/eda/00_analisis.log$(RESET)"
+	@TMP=$$(mktemp); \
+	PYTHONPATH=02_eda:02_eda/analysis:00_cache-manager $(PYTHON) -u $(EDA_ANALYSIS_SCRIPT) > $$TMP 2>&1; \
+	PY_EXIT_CODE=$$?; PY_OUTPUT=$$(cat $$TMP); rm -f $$TMP; \
 	if [ $$PY_EXIT_CODE -ne 0 ]; then \
-		echo "$(RED)❌ Error durante el análisis EDA$(RESET)"; exit 1; \
+		echo "$(RED)❌ Error durante el análisis EDA$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	elif echo "$$PY_OUTPUT" | grep -q "CACHE_USED"; then \
 		echo "$(YELLOW)ℹ️  EDA omitido, se reutilizó cache.$(RESET)\n"; \
 	elif echo "$$PY_OUTPUT" | grep -q "DONE"; then \
 		echo "$(GREEN)✅ EDA finalizado$(RESET)\n"; \
-		echo "\tRevisa el log en: $(YELLOW)reports/clean/00_analisis.log$(RESET)"; \
+		echo "\tRevisa el log en: $(YELLOW)reports/eda/00_analisis.log$(RESET)"; \
 	else \
-		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; exit 1; \
+		echo "$(RED)❌ Salida inesperada del script Python$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
 	fi
 
 # Limpieza total
 clean:
 	@echo "$(BLUE)$(BOLD)🧹 Limpiando artefactos generados...$(RESET)"
-	@for dir in reports/clean reports/results cache data/clean reports/eda; do \
+	@for dir in reports/clean reports/results cache data/clean reports/eda images/eda; do \
 		if [ -d $$dir ]; then \
 			echo "$(YELLOW)\t- Eliminando: $$dir$(RESET)"; \
 			rm -rf $$dir; \
