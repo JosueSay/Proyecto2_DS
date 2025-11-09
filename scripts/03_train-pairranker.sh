@@ -9,7 +9,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${REPO_DIR}/venv/bin/activate"
 SRC_DIR="${REPO_DIR}/m_pair-ranker-deberta/src"
 CFG="${REPO_DIR}/m_pair-ranker-deberta/configs/default.yaml"
-TRAIN_CSV="${REPO_DIR}/data/clean/data_clean_aug.csv"
+TRAIN_CSV="${REPO_DIR}/data/clean/train_strat.csv"
 VALID_CSV="${REPO_DIR}/data/clean/valid_strat.csv"
 OUT_DIR="${REPO_DIR}/results/deberta/run_$(date +%Y%m%d_%H%M%S)"
 
