@@ -1,7 +1,7 @@
 model_name: deberta-v3-base
 pretrained_name: microsoft/deberta-v3-base
 
-# tokenización
+# longitudes (coherentes con el pipeline)
 max_len_prompt: 96
 max_len_resp: 288
 
@@ -28,7 +28,7 @@ dataloader:
   persistent_workers: true
 
 data:
-  train_csv: data/clean/data_clean_aug.csv
+  train_csv: data/clean/train_strat.csv
   valid_csv: data/clean/valid_strat.csv
   test_csv: data/clean/test_clean.csv
   use_label: true
@@ -40,10 +40,11 @@ data:
   respA_col: response_a_clean
   respB_col: response_b_clean
 
-# pérdida
+# pérdida y regularización
 loss:
   type: cross_entropy
-  label_smoothing: 0.05
+  label_smoothing: 0.10
+  class_weights: [1.0, 1.0, 0.85]  # menor peso a TIE
 
 # logging / salidas
 logging:
@@ -55,6 +56,10 @@ logging:
   confusion_csv: confusion.csv
   class_report_csv: class_report.csv
   preds_sample_csv: preds.csv
+  pred_distributions_csv: pred_distributions.csv
+  val_pred_tpl: val_predictions_epoch_{:02}.csv
+  token_budget_tpl: token_budget_epoch_{:02}.csv
+  run_config_used: run_config_used.yaml
   step_interval: 200
 
 # monitoreo / checkpoints

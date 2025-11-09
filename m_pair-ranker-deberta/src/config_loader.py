@@ -1,5 +1,7 @@
+import os
 import yaml
 from pathlib import Path
+from typing import Any
 
 REQUIRED_SCHEMA = {
     "model_name": str,
@@ -41,6 +43,7 @@ REQUIRED_SCHEMA = {
     "loss": {
         "type": ("cross_entropy", "bt", "bradley-terry", "ranknet"),
         "label_smoothing": float,
+        "class_weights": list,
     },
     "logging": {
         "reports_dir": str,
@@ -51,6 +54,10 @@ REQUIRED_SCHEMA = {
         "confusion_csv": str,
         "class_report_csv": str,
         "preds_sample_csv": str,
+        "pred_distributions_csv": str,
+        "val_pred_tpl": str,
+        "token_budget_tpl": str,
+        "run_config_used": str,
         "step_interval": int,
     },
     "monitor": {
@@ -74,20 +81,30 @@ REQUIRED_SCHEMA = {
 }
 
 def loadYamlConfig(path_yaml: str) -> dict:
-    # lee yaml, valida estructura y tipos definidos en el esquema
     path = Path(path_yaml)
     if not path.exists():
         raise FileNotFoundError(f"no existe el yaml: {path_yaml}")
+
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
+
     if not isinstance(data, dict):
         raise ValueError("el yaml debe mapear a un dict de nivel raíz")
+
     checkNoExtraKeys(data, REQUIRED_SCHEMA, root="config")
     checkMissingKeys(data, REQUIRED_SCHEMA, root="config")
-    return validateAndCoerce(data, REQUIRED_SCHEMA, root="config")
+    cfg = validateAndCoerce(data, REQUIRED_SCHEMA, root="config")
 
-def checkMissingKeys(node: dict, schema: dict | tuple | type, root: str) -> None:
-    # asegura que no falten claves esperadas
+    # guardar la config efectiva en reports_dir/run_config_used
+    rep_dir = Path(cfg["logging"]["reports_dir"])
+    rep_dir.mkdir(parents=True, exist_ok=True)
+    out_cfg = rep_dir / cfg["logging"]["run_config_used"]
+    with out_cfg.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False, allow_unicode=True)
+
+    return cfg
+
+def checkMissingKeys(node: Any, schema: Any, root: str) -> None:
     if isinstance(schema, dict):
         if not isinstance(node, dict):
             raise TypeError(f"{root} debe ser dict")
@@ -97,8 +114,7 @@ def checkMissingKeys(node: dict, schema: dict | tuple | type, root: str) -> None
         for k, sub in schema.items():
             checkMissingKeys(node[k], sub, f"{root}.{k}")
 
-def checkNoExtraKeys(node: dict, schema: dict | tuple | type, root: str) -> None:
-    # rechaza claves no definidas en el esquema
+def checkNoExtraKeys(node: Any, schema: Any, root: str) -> None:
     if isinstance(schema, dict):
         if not isinstance(node, dict):
             raise TypeError(f"{root} debe ser dict")
@@ -109,17 +125,13 @@ def checkNoExtraKeys(node: dict, schema: dict | tuple | type, root: str) -> None
             if k in node:
                 checkNoExtraKeys(node[k], sub, f"{root}.{k}")
 
-def validateAndCoerce(node: dict | str | int | float | bool,
-                      schema: dict | tuple | type,
-                      root: str):
-    # valida tipos y hace coerción segura (por ejemplo str -> float/int)
+def validateAndCoerce(node: Any, schema: Any, root: str):
     if isinstance(schema, dict):
         if not isinstance(node, dict):
             raise TypeError(f"{root} debe ser dict")
         return {k: validateAndCoerce(node[k], sub, f"{root}.{k}") for k, sub in schema.items()}
 
     if isinstance(schema, tuple):
-        # enum de strings válidos
         if not isinstance(node, str):
             raise TypeError(f"{root} debe ser str y uno de {schema}, recibido {type(node).__name__}")
         if node not in schema:
@@ -144,9 +156,9 @@ def validateAndCoerce(node: dict | str | int | float | bool,
                 return int(node)
             raise TypeError(f"{root} debe ser int, recibido float no entero")
         if isinstance(node, str):
-            node_s = node.strip()
-            if node_s.isdigit() or (node_s.startswith("-") and node_s[1:].isdigit()):
-                return int(node_s)
+            s = node.strip()
+            if s.isdigit() or (s.startswith("-") and s[1:].isdigit()):
+                return int(s)
             raise TypeError(f"{root} debe ser int, recibido str no entero")
         raise TypeError(f"{root} debe ser int, recibido {type(node).__name__}")
 
@@ -160,10 +172,14 @@ def validateAndCoerce(node: dict | str | int | float | bool,
             return node
         raise TypeError(f"{root} debe ser str, recibido {type(node).__name__}")
 
+    if schema is list:
+        if isinstance(node, list):
+            return node
+        raise TypeError(f"{root} debe ser list, recibido {type(node).__name__}")
+
     raise TypeError(f"{root} tiene un tipo de esquema no soportado")
 
 def getValue(cfg: dict, path: str):
-    # acceso tipo 'data.train_csv' sin fallback
     parts = path.split(".")
     cur = cfg
     for p in parts:
