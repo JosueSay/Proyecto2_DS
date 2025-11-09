@@ -1,4 +1,5 @@
 cache_files:
   CleaningDone: cleaning_done.txt
   SummaryDone: summary_done.txt
+  SummaryTrainValid: summary_train_valid.txt
   EdaDone: eda_dibe.txt
