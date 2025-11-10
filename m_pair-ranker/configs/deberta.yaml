@@ -46,7 +46,7 @@ dataloader:
 
 # pérdida y regularización
 loss:
-  type: bt
+  type: "bradley_terry"
   label_smoothing: 0.05
   class_weights: [1.0, 1.0, 1.6]
 
