@@ -1,8 +1,8 @@
 # modelo base
 model:
-  name: deberta-v3-base
-  pretrained_name: microsoft/deberta-v3-base
-  dropout: 0.1
+  name: xlnet-base-cased
+  pretrained_name: xlnet-base-cased
+  dropout: 0.20
   grad_checkpointing: true
   compile: false
 
@@ -13,14 +13,14 @@ lengths:
 
 # entrenamiento
 train:
-  epochs: 6
-  batch_size: 8
-  grad_accum: 2
-  lr: 1e-5
+  epochs: 8
+  batch_size: 6
+  grad_accum: 3
+  lr: 8e-6
   weight_decay: 0.01
   warmup_ratio: 0.10
   scheduler: cosine
-  clip_norm: 5.0
+  clip_norm: 2.0
   seed: 42
   amp: "false"
   num_workers: 8
@@ -32,7 +32,7 @@ data:
   use_label: true
   use_clean_cols: true
   shuffle: true
-  val_batch_size: 32
+  val_batch_size: 24
   pin_memory: true
   prompt_col: prompt_clean
   respA_col: response_a_clean
@@ -40,26 +40,26 @@ data:
 
 # dataloader
 dataloader:
-  prefetch_factor_train: 6
-  prefetch_factor_val: 6
+  prefetch_factor_train: 4
+  prefetch_factor_val: 4
   persistent_workers: true
 
 # pérdida y regularización
 loss:
-  type: bt
-  label_smoothing: 0.05
-  class_weights: [1.0, 1.0, 1.6]
+  type: "bradley_terry"
+  label_smoothing: 0.10
+  class_weights: [1.0, 1.0, 2.1]
 
 # evaluación e inferencia
 eval:
-  bt_temp: 0.8
-  tie_tau: 0.6
-  tie_alpha: 0.7
+  bt_temp: 0.85
+  tie_tau: 0.70
+  tie_alpha: 0.85
 
 # logging y salidas
 logging:
-  reports_dir: reports/deberta
-  runs_dir: results/deberta
+  reports_dir: reports/xlnet
+  runs_dir: results/xlnet
   step_csv: steps.csv
   epoch_csv: epochs.csv
   alerts_csv: alerts.csv

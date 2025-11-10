@@ -1,8 +1,8 @@
 # modelo base
 model:
-  name: deberta-v3-base
-  pretrained_name: microsoft/deberta-v3-base
-  dropout: 0.1
+  name: electra-base-discriminator
+  pretrained_name: google/electra-base-discriminator
+  dropout: 0.20
   grad_checkpointing: true
   compile: false
 
@@ -13,14 +13,14 @@ lengths:
 
 # entrenamiento
 train:
-  epochs: 6
+  epochs: 8
   batch_size: 8
   grad_accum: 2
-  lr: 1e-5
-  weight_decay: 0.01
+  lr: 8e-6
+  weight_decay: 0.02
   warmup_ratio: 0.10
   scheduler: cosine
-  clip_norm: 5.0
+  clip_norm: 2.0
   seed: 42
   amp: "false"
   num_workers: 8
@@ -46,20 +46,20 @@ dataloader:
 
 # pérdida y regularización
 loss:
-  type: bt
-  label_smoothing: 0.05
-  class_weights: [1.0, 1.0, 1.6]
+  type: "bradley_terry"
+  label_smoothing: 0.10
+  class_weights: [1.0, 1.0, 2.0]
 
 # evaluación e inferencia
 eval:
-  bt_temp: 0.8
-  tie_tau: 0.6
-  tie_alpha: 0.7
+  bt_temp: 0.70
+  tie_tau: 0.70
+  tie_alpha: 0.85
 
 # logging y salidas
 logging:
-  reports_dir: reports/deberta
-  runs_dir: results/deberta
+  reports_dir: reports/electra
+  runs_dir: results/electra
   step_csv: steps.csv
   epoch_csv: epochs.csv
   alerts_csv: alerts.csv
@@ -91,4 +91,4 @@ env:
   cuda_launch_blocking: 0
   pytorch_cuda_alloc_conf: "max_split_size_mb:128"
   hf_home: ".hf_cache"
-  use_slow_tokenizer: true
+  use_slow_tokenizer: false

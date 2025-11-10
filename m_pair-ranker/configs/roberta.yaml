@@ -1,8 +1,8 @@
 # modelo base
 model:
-  name: deberta-v3-base
-  pretrained_name: microsoft/deberta-v3-base
-  dropout: 0.1
+  name: roberta-base
+  pretrained_name: roberta-base
+  dropout: 0.15
   grad_checkpointing: true
   compile: false
 
@@ -16,11 +16,11 @@ train:
   epochs: 6
   batch_size: 8
   grad_accum: 2
-  lr: 1e-5
+  lr: 2e-5
   weight_decay: 0.01
-  warmup_ratio: 0.10
+  warmup_ratio: 0.06
   scheduler: cosine
-  clip_norm: 5.0
+  clip_norm: 2.5
   seed: 42
   amp: "false"
   num_workers: 8
@@ -46,20 +46,20 @@ dataloader:
 
 # pérdida y regularización
 loss:
-  type: bt
-  label_smoothing: 0.05
-  class_weights: [1.0, 1.0, 1.6]
+  type: "bradley_terry"
+  label_smoothing: 0.10
+  class_weights: [1.0, 1.0, 1.9]
 
 # evaluación e inferencia
 eval:
-  bt_temp: 0.8
-  tie_tau: 0.6
-  tie_alpha: 0.7
+  bt_temp: 0.80
+  tie_tau: 0.60
+  tie_alpha: 0.80
 
 # logging y salidas
 logging:
-  reports_dir: reports/deberta
-  runs_dir: results/deberta
+  reports_dir: reports/roberta
+  runs_dir: results/roberta
   step_csv: steps.csv
   epoch_csv: epochs.csv
   alerts_csv: alerts.csv
@@ -91,4 +91,4 @@ env:
   cuda_launch_blocking: 0
   pytorch_cuda_alloc_conf: "max_split_size_mb:128"
   hf_home: ".hf_cache"
-  use_slow_tokenizer: true
+  use_slow_tokenizer: false

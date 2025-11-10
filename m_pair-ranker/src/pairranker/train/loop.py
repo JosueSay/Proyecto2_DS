@@ -17,6 +17,10 @@ from pairranker.train.utils import (
 )
 from pairranker.train.validation import runValidation, collapseAlert
 
+from transformers.utils import logging as hf_logging
+hf_logging.set_verbosity_error()
+
+
 def _dlKw(dataset, bs, shuffle, coll, nw, pin, pf, pw):
     kw = dict(dataset=dataset, batch_size=bs, shuffle=shuffle, collate_fn=coll,
               num_workers=nw, pin_memory=pin, persistent_workers=(pw and nw>0))
