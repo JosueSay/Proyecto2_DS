@@ -31,9 +31,9 @@ models:
     results_dir: "results/xlnet"
     reports_dir: "reports/xlnet"
   roberta:
-    enabled: false
-    results_dir: "results/roberta"     # reservado
-    reports_dir: "reports/roberta"     # reservado
+    enabled: true
+    results_dir: "results/roberta"
+    reports_dir: "reports/roberta"
   electra:
     enabled: false
     results_dir: "results/electra"     # reservado

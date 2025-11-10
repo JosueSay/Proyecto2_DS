@@ -154,6 +154,66 @@ Incluye:
 
 Funciona como un **registro de auditoría legible** del proceso de limpieza y análisis, útil para seguimiento de versiones o validación ante terceros.
 
+```mermaid
+flowchart TD
+    %% ====== Nodos principales ======
+    A[Leer CSVs crudos<br>#40;data/train.csv, data/test.csv#41;] --> B[Normalizar textos<br>#40;prompt/resp A-B#41;]
+    B --> C{Detección de duplicados<br>cosine TF-IDF / jaccard}
+    C -- "≥ umbral" --> C1[Eliminar/Marcar duplicados]
+    C -- "< umbral" --> D[Conservar registros]
+    C1 --> E[Medición de longitudes<br>p95/p99 · truncado teórico/real]
+    D  --> E
+    E --> F[Balanceo & Estratificación<br>#40;train/valid#41;]
+    F --> G[Swap A↔B en train<br>#40;robustez/anti-sesgo#41;]
+    G --> H[Validación & Auditoría]
+
+    %% ====== Salidas a data/clean ======
+    subgraph DC[Salidas · data/clean/]
+      direction TB
+      S1[[data_clean.csv<br>#40;base limpia#41;]]
+      S2[[train_strat.csv<br>#40;train estratificado+swap#41;]]
+      S3[[valid_strat.csv<br>#40;valid estratificado#41;]]
+      S4[[split_meta.json<br>umbrales & trazabilidad]]
+    end
+
+    %% ====== Salidas a reports/clean ======
+    subgraph RC[Reportes · reports/clean/]
+      direction TB
+      R1[[class_balance_detail.csv]]
+      R2[[length_by_class_train.csv / valid.csv]]
+      R3[[ab_similarity_train.csv / valid.csv]]
+      R4[[near_duplicates_ab.csv]]
+      R5[[truncation_impact_train_valid.csv<br>+ _real.csv]]
+      R6[[sample_texts_train_valid.csv]]
+      R7[[00_analisis.log]]
+    end
+
+    %% ====== Flujos a salidas ======
+    B --> S1
+    F --> S2
+    F --> S3
+    C --> S4
+    E --> S4
+    H --> R1
+    H --> R2
+    H --> R3
+    H --> R4
+    H --> R5
+    H --> R6
+    H --> R7
+
+    %% ====== Estilos #40;paleta del proyecto#41; ======
+    classDef proc fill:#1B3B5F,stroke:#1B3B5F,color:#F7F9FC
+    classDef data fill:#5C7EA3,stroke:#2E5984,color:#F7F9FC
+    classDef rep  fill:#F28C38,stroke:#C14953,color:#1B3B5F
+    classDef gate fill:#B0BEC5,stroke:#2E5984,color:#1B3B5F
+
+    class A,B,C1,D,E,F,G,H proc
+    class C gate
+    class S1,S2,S3,S4 data
+    class R1,R2,R3,R4,R5,R6,R7 rep
+```
+
 ### En resumen
 
 | Archivo                        | Propósito principal                    |
