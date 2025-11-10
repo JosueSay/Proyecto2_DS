@@ -43,7 +43,7 @@ with tab_form:
             df = pd.DataFrame([{"id": 0, "prompt": prompt, "response_a": resp_a, "response_b": resp_b}])
             df_clean = cleanBatch(df)
             run = getRunByName(model, run_name, cfg)
-            out = predictBatch(model, run["name"], df_clean)  # reutiliza batch para 1 fila
+            out = predictBatch(df_clean, model)  # reutiliza batch para 1 fila
             st.dataframe(out, width="stretch")
 
 # batch: csv
@@ -67,7 +67,7 @@ with tab_batch:
                 st.warning("elige modelo y run")
             else:
                 run = getRunByName(model, run_name, cfg)
-                preds = predictBatch(model, run["name"], df_clean)
+                preds = predictBatch(df_clean, model)
                 st.success("listo")
                 st.dataframe(preds.head(50), width="stretch")
                 st.download_button("descargar predicciones", preds.to_csv(index=False), "preds.csv", "text/csv")
