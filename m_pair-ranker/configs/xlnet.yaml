@@ -3,7 +3,7 @@ model:
   name: xlnet-base-cased
   pretrained_name: xlnet-base-cased
   dropout: 0.20
-  grad_checkpointing: true
+  grad_checkpointing: false
   compile: false
 
 # longitudes de entrada
