@@ -1,0 +1,54 @@
+app:
+  title: "PairRanker Dashboard"
+  favicon: "app/assets/icon.png"
+
+theme:
+  mode: "light"
+  colors:
+    primary: "#1B3B5F"
+    secondary: "#2E5984"
+    mid: "#5C7EA3"
+    neutral: "#B0BEC5"
+    accent: "#F28C38"
+    success: "#3D8361"
+    danger: "#C14953"
+    background: "#F7F9FC"
+
+paths:
+  repo_root: "."
+  results_root: "results"
+  reports_root: "reports"
+  data_root: "data"
+  images_root: "images"
+
+models:
+  deberta:
+    enabled: true
+    results_dir: "results/deberta"
+    reports_dir: "reports/deberta"
+  xlnet:
+    enabled: true
+    results_dir: "results/xlnet"
+    reports_dir: "reports/xlnet"
+  roberta:
+    enabled: false
+    results_dir: "results/roberta"     # reservado
+    reports_dir: "reports/roberta"     # reservado
+  electra:
+    enabled: false
+    results_dir: "results/electra"     # reservado
+    reports_dir: "reports/electra"     # reservado
+
+runs:
+  prefix: "run_"
+  pattern: "run_%Y%m%d_%H%M%S"
+
+reports_expected:
+  steps: "steps.csv"
+  epochs: "epochs.csv"
+  alerts: "alerts.csv"
+  confusion: "confusion.csv"
+  class_report: "class_report.csv"
+  pred_distributions: "pred_distributions.csv"
+  val_pred_tpl: "val_predictions_epoch_{:02}.csv"
+  token_budget_tpl: "token_budget_epoch_{:02}.csv"

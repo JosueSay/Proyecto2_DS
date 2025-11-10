@@ -1,0 +1,39 @@
+/* app/assets/styles.css */
+:root{
+  --c-primary:#1B3B5F;
+  --c-secondary:#2E5984;
+  --c-mid:#5C7EA3;
+  --c-neutral:#B0BEC5;
+  --c-accent:#F28C38;
+  --c-success:#3D8361;
+  --c-danger:#C14953;
+  --c-bg:#F7F9FC;
+}
+
+/* fondo general */
+.stApp, .block-container{ background: var(--c-bg) !important; }
+
+/* títulos */
+h1, h2, h3, h4{ color: var(--c-primary) !important; }
+
+/* tabs (marcado) */
+[role="tab"][aria-selected="true"]{
+  border-bottom: 2px solid var(--c-secondary) !important;
+}
+
+/* botones primarios */
+.stButton>button{
+  background: var(--c-primary) !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+.stButton>button:hover{ filter: brightness(0.95); }
+
+/* tablas: borde sutil */
+[data-testid="stDataFrame"]{
+  border: 1px solid var(--c-neutral);
+  border-radius: 8px;
+}
+
+/* métricas */
+[data-testid="stMetricValue"]{ color: var(--c-primary) !important; }
