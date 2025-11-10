@@ -78,6 +78,11 @@ REQUIRED_SCHEMA = {
         "hf_home": str,
         "use_slow_tokenizer": bool,
     },
+    "eval": {
+        "bt_temp": float,
+        "tie_tau": float,
+        "tie_alpha": float,
+    },    
 }
 
 def loadYamlConfig(path_yaml: str) -> dict:

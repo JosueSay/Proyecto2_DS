@@ -9,13 +9,13 @@ max_len_resp: 320
 epochs: 6
 batch_size: 8
 grad_accum: 2
-lr: 2e-5
+lr: 1e-5
 weight_decay: 0.01
-warmup_ratio: 0.06
+warmup_ratio: 0.10
 scheduler: cosine
-clip_norm: 2.5
+clip_norm: 5.0
 seed: 42
-amp: "bf16"
+amp: "false"
 num_workers: 8
 dropout: 0.1
 grad_checkpointing: true
@@ -43,8 +43,8 @@ data:
 # pérdida y regularización
 loss:
   type: bt
-  label_smoothing: 0.0
-  class_weights: [1.0, 1.0, 1.0]
+  label_smoothing: 0.05
+  class_weights: [1.0, 1.0, 1.4]
 
 # logging / salidas
 logging:
@@ -81,4 +81,9 @@ env:
 early_stopping:
   metric: macro_f1
   mode: max
-  patience: 2
+  patience: 3
+
+eval:
+  bt_temp: 0.9     # temperatura para σ(Δ/T)
+  tie_tau: 0.7     # decaimiento de empate: exp(-|Δ|/tau)
+  tie_alpha: 0.8   # masa máxima asignable a TIE (0..1)

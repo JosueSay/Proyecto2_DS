@@ -77,12 +77,29 @@ def collapseAlert(dist, val_acc, ent, tol=0.05):
 
 @torch.inference_mode()
 def runValidation(model, loader, device, use_amp, epoch_idx, logs):
-    loss_fn = makeLoss(logs["cfg"])
+    """
+    Validación unificada para CE (3-clases) y BT (pairwise).
+    - Si loss.type ∈ {bt, bradley-terry, ranknet}:
+        usa Δ = s_a - s_b para construir probs [pA, pB, pTIE]
+        con temperatura y regla de empate del YAML (eval.bt_temp, eval.tie_tau, eval.tie_alpha).
+    - Si no, usa softmax sobre logits 3-clases.
+    """
+    cfg = logs["cfg"]
+    loss_fn = makeLoss(cfg)
+
+    # === parámetros de evaluación (OBLIGATORIOS EN YAML) ===
+    loss_type = str(cfg.get("loss", {}).get("type", "")).lower()
+    is_bt = loss_type in {"bt", "bradley-terry", "ranknet"}
+    ev = cfg.get("eval", {})
+    T   = float(ev.get("bt_temp", 1.0))
+    tau = float(ev.get("tie_tau", 0.5))
+    alpha = float(ev.get("tie_alpha", 0.6))
+
     amp_kwargs = dict(device_type="cuda", dtype=torch.bfloat16) if (use_amp and device=="cuda") else dict(device_type=device, enabled=False)
 
     all_probs, all_y, losses, steps = [], [], 0.0, 0
-    seq_lens = []  # para val_predictions
-    idx0 = 0
+    seq_lens = []
+    all_delta, all_sa, all_sb = [], [], []
 
     pbar = tqdm(loader, total=len(loader), desc=f"val {epoch_idx}", leave=False, dynamic_ncols=True)
     for encA, encB, y, _, _ in pbar:
@@ -90,22 +107,55 @@ def runValidation(model, loader, device, use_amp, epoch_idx, logs):
         encA = {k: v.to(device, non_blocking=True) for k, v in encA.items()}
         encB = {k: v.to(device, non_blocking=True) for k, v in encB.items()}
         y = y.to(device, non_blocking=True)
+
         with autocast(**amp_kwargs):
             out = model(encA, encB)
             loss = loss_fn(out, {"label": y})
-            probs = torch.softmax(out[0], dim=-1)
-        losses += float(loss.detach().cpu()); steps += 1
+
+            # ---- construir probabilidades según el tipo de loss ----
+            if is_bt:
+                # out esperado: (logits3, s_a, s_b) o (s_a, s_b)
+                if isinstance(out, (tuple, list)):
+                    if len(out) == 3:
+                        _, s_a, s_b = out
+                    elif len(out) == 2:
+                        s_a, s_b = out
+                    else:
+                        raise ValueError(f"Salida del modelo no válida para BT: len={len(out)}")
+                else:
+                    raise ValueError("Salida del modelo no válida para BT (se esperaba tuple/list).")
+
+                # --- ESTABILIZA delta ---
+                delta = torch.clamp(s_a - s_b, -20.0, 20.0)
+                pA = torch.sigmoid(delta / max(1e-6, T))
+                pB = 1.0 - pA
+                # masa de empate suave
+                pT = torch.exp(-torch.abs(delta) / max(1e-6, tau)) * float(alpha)
+                pT = torch.clamp(pT, 0.0, 0.95)  # evita 1.0 exacto
+                probs = torch.stack([pA * (1.0 - pT), pB * (1.0 - pT), pT], dim=-1)
+
+                all_delta.append(delta.detach().cpu().float())
+                all_sa.append(s_a.detach().cpu().float())
+                all_sb.append(s_b.detach().cpu().float())
+            else:
+                # --- CE 3-clases con softmax estable ---
+                logits = out[0] if isinstance(out, (tuple, list)) else out
+                logits = logits - logits.max(dim=-1, keepdim=True).values  # TRUCO CLAVE
+                probs = torch.softmax(logits, dim=-1)
+
+
+        losses += float(loss.detach().cpu())
+        steps += 1
         all_probs.append(probs.detach().cpu().numpy())
         all_y.append(y.detach().cpu().numpy())
 
-        # seq_len_total por fila (max entre A/B)
+        # seq_len_total por fila (máximo entre A/B)
         la = encA["attention_mask"].sum(dim=1).detach().cpu().numpy()
         lb = encB["attention_mask"].sum(dim=1).detach().cpu().numpy()
         seq_lens.append(np.maximum(la, lb))
 
         if steps % 10 == 0:
             pbar.set_postfix(loss=f"{losses/steps:.4f}")
-        idx0 += bs
 
     if steps == 0:
         return dict(val_loss=np.nan, val_acc=np.nan, macro_f1=np.nan, entropy=np.nan, dist=[np.nan]*3, conf=None, per=None)
@@ -114,6 +164,7 @@ def runValidation(model, loader, device, use_amp, epoch_idx, logs):
     y_np = np.concatenate(all_y, 0)
     seq_np = np.concatenate(seq_lens, 0).astype(int)
 
+    # métricas
     acc, macro_f1, ent, dist, conf = classMetrics(probs_np, y_np)
     per = perClassMetrics(conf)
 
@@ -121,15 +172,23 @@ def runValidation(model, loader, device, use_amp, epoch_idx, logs):
     rep_dir = logs["reports_dir"]; df_src = loader.dataset.df.reset_index(drop=True)
     y_pred = probs_np.argmax(1).astype(int)
 
-    # predicciones de validación (con longitudes del CSV y seq_len_total)
-    out_df = pd.DataFrame({
+    out_df_dict = {
         "p_A": probs_np[:,0], "p_B": probs_np[:,1], "p_TIE": probs_np[:,2],
         "y_true": y_np.astype(int), "y_pred": y_pred,
         "prompt_len": df_src.get("prompt_len", pd.Series([np.nan]*len(df_src))).iloc[:len(y_np)].to_list(),
         "respA_len":  df_src.get("respA_len",  pd.Series([np.nan]*len(df_src))).iloc[:len(y_np)].to_list(),
         "respB_len":  df_src.get("respB_len",  pd.Series([np.nan]*len(df_src))).iloc[:len(y_np)].to_list(),
         "seq_len_total": seq_np,
-    })
+    }
+
+    # adjuntar delta/sa/sb si es BT
+    if is_bt:
+        delta_np = torch.cat(all_delta, 0).numpy()
+        sa_np    = torch.cat(all_sa, 0).numpy()
+        sb_np    = torch.cat(all_sb, 0).numpy()
+        out_df_dict.update({"delta": delta_np, "s_a": sa_np, "s_b": sb_np})
+
+    out_df = pd.DataFrame(out_df_dict)
     if "id" in df_src.columns:
         out_df.insert(0, "id", df_src["id"].iloc[:len(y_np)].to_list())
     out_df.to_csv(os.path.join(rep_dir, f"val_predictions_epoch_{epoch_idx:02d}.csv"), index=False)
@@ -146,7 +205,8 @@ def runValidation(model, loader, device, use_amp, epoch_idx, logs):
                 "var_p_A":  float(sub[:,0].var()),  "var_p_B":  float(sub[:,1].var()),  "var_p_TIE":  float(sub[:,2].var()),
                 "n": int(mask.sum())
             })
-    pd.DataFrame(dist_rows).to_csv(os.path.join(rep_dir, "pred_distributions.csv"), mode="a", header=not os.path.exists(os.path.join(rep_dir, "pred_distributions.csv")), index=False)
+    pd.DataFrame(dist_rows).to_csv(os.path.join(rep_dir, "pred_distributions.csv"), mode="a",
+                                   header=not os.path.exists(os.path.join(rep_dir, "pred_distributions.csv")), index=False)
 
     # confusion + class_report (versionado y último)
     pd.DataFrame(conf, columns=["pred_A","pred_B","pred_TIE"]).assign(true=["A","B","TIE"])\
@@ -165,6 +225,7 @@ def runValidation(model, loader, device, use_amp, epoch_idx, logs):
     ]).to_csv(os.path.join(rep_dir, "class_report.csv"), index=False)
 
     return dict(val_loss=losses/steps, val_acc=acc, macro_f1=macro_f1, entropy=ent, dist=dist, conf=conf, per=per)
+
 
 # ================== entrenamiento ==================
 def trainModel(train_csv, out_dir, cfg_path="m_pair-ranker-deberta/configs/default.yaml", valid_csv=None):
@@ -284,16 +345,34 @@ def trainModel(train_csv, out_dir, cfg_path="m_pair-ranker-deberta/configs/defau
                     out = model(encA, encB)
                     loss = loss_fn(out, {"label": y}) / grad_accum
 
+                # --- Guardia: ignora batch si loss no es finito ---
+                if not torch.isfinite(loss):
+                    pd.DataFrame([{
+                        "time": nowStr(), "epoch": ep, "step": step, "global_step": global_step,
+                        "lr": getLr(opt), "loss": float('nan'), "grad_norm": float('nan'),
+                        "gpu_mem_mb": round(gpuMemMB(), 1),
+                    }]).to_csv(step_csv, mode="a", header=False, index=False)
+                    opt.zero_grad(set_to_none=True)
+                    continue
+
                 scaler.scale(loss).backward()
+
 
                 stepped = False
                 grad_norm_val = None
                 if step % grad_accum == 0:
                     scaler.unscale_(opt)
+
+                    # --- Sanitiza gradientes (evita NaN/Inf) ---
+                    for p in model.parameters():
+                        if p.grad is not None:
+                            torch.nan_to_num_(p.grad, nan=0.0, posinf=1e4, neginf=-1e4)
+
                     clip_norm = float(getValue(cfg, "clip_norm"))
                     if clip_norm and clip_norm > 0:
                         torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
                     grad_norm_val = gradGlobalNorm(model)
+
                     scaler.step(opt); scaler.update()
                     opt.zero_grad(set_to_none=True); sch.step()
                     stepped = True; global_step += 1
