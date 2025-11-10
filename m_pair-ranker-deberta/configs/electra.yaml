@@ -1,36 +1,34 @@
-model_name: deberta-v3-base
-pretrained_name: microsoft/deberta-v3-base
+# modelo base
+model:
+  name: deberta-v3-base
+  pretrained_name: microsoft/deberta-v3-base
+  dropout: 0.1
+  grad_checkpointing: true
+  compile: false
 
-# longitudes
-max_len_prompt: 96
-max_len_resp: 320
+# longitudes de entrada
+lengths:
+  max_len_prompt: 96
+  max_len_resp: 320
 
 # entrenamiento
-epochs: 6
-batch_size: 8
-grad_accum: 2
-lr: 1e-5
-weight_decay: 0.01
-warmup_ratio: 0.10
-scheduler: cosine
-clip_norm: 5.0
-seed: 42
-amp: "false"
-num_workers: 8
-dropout: 0.1
-grad_checkpointing: true
-compile: false
+train:
+  epochs: 6
+  batch_size: 8
+  grad_accum: 2
+  lr: 1e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.10
+  scheduler: cosine
+  clip_norm: 5.0
+  seed: 42
+  amp: "false"
+  num_workers: 8
 
 # datos
-dataloader:
-  prefetch_factor_train: 6
-  prefetch_factor_val: 6
-  persistent_workers: true
-
 data:
   train_csv: data/clean/train_strat.csv
   valid_csv: data/clean/valid_strat.csv
-  test_csv: data/clean/test_clean.csv
   use_label: true
   use_clean_cols: true
   shuffle: true
@@ -40,13 +38,25 @@ data:
   respA_col: response_a_clean
   respB_col: response_b_clean
 
+# dataloader
+dataloader:
+  prefetch_factor_train: 6
+  prefetch_factor_val: 6
+  persistent_workers: true
+
 # pérdida y regularización
 loss:
   type: bt
   label_smoothing: 0.05
   class_weights: [1.0, 1.0, 1.6]
 
-# logging / salidas
+# evaluación e inferencia
+eval:
+  bt_temp: 0.8
+  tie_tau: 0.6
+  tie_alpha: 0.7
+
+# logging y salidas
 logging:
   reports_dir: reports/deberta
   runs_dir: results/deberta
@@ -62,20 +72,12 @@ logging:
   run_config_used: run_config_used.yaml
   step_interval: 200
 
-# monitoreo / checkpoints
+# monitoreo/checkpoints
 monitor:
   detect_collapse: true
   save_best_by: macro_f1
   save_last: true
   verbose: true
-
-# entorno / tokenizador
-env:
-  tokenizers_parallelism: true
-  cuda_launch_blocking: 0
-  pytorch_cuda_alloc_conf: "max_split_size_mb:128"
-  hf_home: ".hf_cache"
-  use_slow_tokenizer: true
 
 # early stopping
 early_stopping:
@@ -83,7 +85,10 @@ early_stopping:
   mode: max
   patience: 3
 
-eval:
-  bt_temp: 0.8     # temperatura para σ(Δ/T)
-  tie_tau: 0.6     # decaimiento de empate: exp(-|Δ|/tau)
-  tie_alpha: 0.7   # masa máxima asignable a TIE (0..1)
+# entorno
+env:
+  tokenizers_parallelism: true
+  cuda_launch_blocking: 0
+  pytorch_cuda_alloc_conf: "max_split_size_mb:128"
+  hf_home: ".hf_cache"
+  use_slow_tokenizer: true
