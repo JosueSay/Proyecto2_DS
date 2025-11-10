@@ -1,153 +1,171 @@
-# Módulo 01_data_cleaning
+# Pipeline de Limpieza
 
-Este módulo contiene el flujo de limpieza, preparación y resumen inicial de los datos utilizados en el proyecto.
-Su propósito es convertir los archivos originales (`train.csv`, `test.csv`) en versiones limpias, balanceadas y listas para entrenamiento o inferencia, asegurando trazabilidad y consistencia entre ejecuciones.
+Este módulo realiza la **limpieza, depuración y división** del dataset en subconjuntos de entrenamiento y validación, asegurando que no haya duplicados y que la información esté balanceada. Además genera métricas y reportes de calidad.
 
-## 1. Ejecución del entorno
+## Archivos CSV generados
 
-Antes de utilizar cualquier script, es necesario configurar y activar el entorno virtual del proyecto:
+### Carpeta: `data/clean/`
 
-```bash
-./scripts/00_setup-environment.sh
+#### 1. `data_clean.csv`
+
+Dataset **final limpio y depurado**, usado como entrada base para los análisis y generación de splits.
+Incluye textos ya normalizados, respuestas limpias y etiquetas.
+**Encabezados principales:**
+
+```csv
+prompt_clean, response_a_clean, response_b_clean, winner, prompt_sig
 ```
 
-Este comando crea (si no existe) el entorno `venv/` y instala todas las dependencias definidas en `requirements.txt`, unificado para todo el repositorio.
+- `prompt_clean`: texto del prompt procesado.
+- `response_a_clean`, `response_b_clean`: respuestas A y B ya limpiadas y truncadas.
+- `winner`: indica cuál de las dos respuestas fue preferida (A o B).
+- `prompt_sig`: firma hash o identificador único del prompt (sirve para agrupar o evitar duplicados).
 
-## 2. Flujo de limpieza de datos
+#### 2. `train_strat.csv`
 
-El proceso de limpieza se ejecuta con:
+Dataset **estratificado y final para entrenamiento**.
+Proviene de `data_clean.csv`, pero incluye muestras balanceadas y duplicadas estratégicamente (“swap”) para mejorar robustez del modelo.
+**Encabezados principales:**
 
-```bash
-./scripts/01_cleaning-data.sh
+```csv
+prompt_clean, response_a_clean, response_b_clean, winner, prompt_sig, split, is_swapped
 ```
 
-Este comando invoca internamente el archivo
-`01_data_cleaning/clean_data.py`, el cual realiza las siguientes acciones:
+- `split`: siempre `"train"`.
+- `is_swapped`: `True` si se intercambiaron las respuestas A↔B (para balancear).
 
-1. **Carga del dataset original**
+> Este es el **CSV que se usa para entrenar el modelo**.
 
-   - Lee `data/train.csv` y `data/test.csv`.
+#### 3. `valid_strat.csv`
 
-2. **Normalización de texto**
+Dataset **de validación**, generado en paralelo al de entrenamiento pero sin “swap”.
+Mismos encabezados que `train_strat.csv`, con `split = "valid"` y `is_swapped = False`.
 
-   - Convierte textos codificados como listas (`["text"]`) en cadenas planas.
-   - Elimina URLs, menciones, hashtags y caracteres no alfabéticos.
-   - Estandariza mayúsculas y elimina stopwords del idioma inglés.
-   - Limpia errores de codificación y espacios redundantes.
+#### 4. `split_meta.json`
 
-3. **Gestión de valores faltantes**
+Este archivo guarda toda la **trazabilidad del proceso de división (split)** del dataset.
+Su función es documentar **cómo se generaron los conjuntos de entrenamiento y validación**, asegurando que el proceso sea **reproducible y auditable**.
 
-   - Se imputa el único valor nulo detectado en `response_a_clean` con `"no response"`.
-   - Se eliminan filas vacías en las columnas de texto principales.
+Contiene:
 
-4. **Generación de etiquetas (`label`)**
+- **Umbrales de similitud** (coseno y jaccard): usados para decidir qué tan parecidos deben ser dos ejemplos para considerarse duplicados.
+- **Conteo de duplicados eliminados o conservados:** permite saber cuántos ejemplos fueron filtrados para evitar fuga de información entre *train* y *valid*.
+- **Porcentaje de prompts compartidos entre splits:** sirve para comprobar que no haya solapamiento (evita que el modelo vea el mismo prompt en ambos conjuntos).
+- **p99 de longitudes:** referencia de las longitudes extremas de prompts y respuestas. Útil para decidir futuros límites de truncado.
+- **Proporción de clases:** garantiza que el balance de etiquetas se mantuvo tras el split.
 
-   - Se crean tres clases:
+### Carpeta: `reports/clean/`
 
-     - `0`: gana modelo A
-     - `1`: gana modelo B
-     - `2`: empate
+Los archivos de esta carpeta se generan para **evaluar la calidad y características del dataset final**, tanto global como por subconjunto (*train* / *valid*).
+Son el resultado del análisis hecho por `data_summary.py`.
 
-5. **Prevención de sesgo posicional (swap A↔B)**
+#### 1. `class_balance_detail.csv`
 
-   - Se duplican las filas invirtiendo `response_a_clean` ↔ `response_b_clean`
-     y `model_a` ↔ `model_b`, ajustando las etiquetas.
-   - El dataset aumentado queda en `data_clean_aug.csv`.
+Evalúa el **equilibrio de clases** entre los conjuntos de entrenamiento y validación.
+Esto es esencial para asegurar que el modelo no aprenda un sesgo hacia una clase dominante.
+Si los porcentajes están muy desbalanceados, se debe revisar la estrategia de muestreo.
 
-6. **Análisis de longitudes**
+**Encabezados:**
 
-   - Se calculan métricas descriptivas (`count`, `mean`, `std`, `max`, etc.)
-     de la longitud de `prompt_clean`, `response_a_clean` y `response_b_clean`.
-   - El resultado se guarda en `length_stats.csv` para definir
-     los parámetros `max_len_prompt` y `max_len_response` de los modelos.
-
-7. **División estratificada (train / valid)**
-
-   - Se generan subconjuntos con `train_test_split` (90/10) estratificando por `label`.
-   - Los resultados se guardan como:
-
-     - `train_strat.csv`
-     - `valid_strat.csv`
-
-8. **Procesamiento de test.csv**
-
-   - Se limpia con el mismo pipeline y se guarda en `test_clean.csv`.
-
-9. **Registro y cacheo**
-
-   - Se guarda un resumen de proceso (`data_process_info.csv`) con:
-     pasos aplicados, fechas, número de filas, imputaciones y división.
-   - Se crea un archivo de caché (`cache/cleaning_done.txt`) para evitar repeticiones.
-
-## 3. Resumen estadístico
-
-Después de la limpieza, se puede generar un informe descriptivo con:
-
-```bash
-./scripts/01-2_summary-data.sh
+```csv
+split, label, count, percent
 ```
 
-Este comando ejecuta `01_data_cleaning/data_summary.py`, que produce múltiples reportes
-y los guarda en la carpeta `reports/clean/`.
+- `split`: indica si el registro pertenece a *train* o *valid*.
+- `label`: clase o categoría (por ejemplo, respuesta ganadora A o B).
+- `count` y `percent`: cantidad y proporción de ejemplos por clase.
 
-Los archivos generados permiten auditar y validar la calidad de los datos.
+#### 2. `length_by_class_train.csv` / `length_by_class_valid.csv`
 
-## 4. Archivos generados
+Mide la **longitud promedio de prompts y respuestas por clase**.
+Sirve para verificar si hay diferencias significativas entre los ejemplos de distintas clases (por ejemplo, si las respuestas ganadoras tienden a ser más largas).
 
-| Archivo                                                                                    | Ubicación        | Descripción                                                                 |
-| ------------------------------------------------------------------------------------------ | ---------------- | --------------------------------------------------------------------------- |
-| **data_clean.csv**                                                                         | `data/clean/`    | Dataset base limpio sin duplicaciones ni filas nulas.                       |
-| **data_clean_aug.csv**                                                                     | `data/clean/`    | Versión aumentada con inversión A↔B para evitar sesgo de posición.          |
-| **train_strat.csv**, **valid_strat.csv**                                                   | `data/clean/`    | Subconjuntos estratificados (90/10) usados para entrenamiento y validación. |
-| **test_clean.csv**                                                                         | `data/clean/`    | Conjunto de prueba limpio con las mismas transformaciones.                  |
-| **length_stats.csv**                                                                       | `data/clean/`    | Estadísticas de longitud promedio y máxima de los textos.                   |
-| **data_process_info.csv**                                                                  | `data/clean/`    | Registro de los pasos de limpieza, imputaciones y resultados de split.      |
-| **describe.csv**, **describe_numeric.csv**                                                 | `reports/clean/` | Estadísticas descriptivas globales (numéricas y categóricas).               |
-| **na_overview.csv**                                                                        | `reports/clean/` | Conteo y porcentaje de valores nulos por columna.                           |
-| **dtypes.csv**                                                                             | `reports/clean/` | Tipos de datos detectados en cada columna.                                  |
-| **head.csv**, **tail.csv**                                                                 | `reports/clean/` | Primeras y últimas filas del dataset limpio.                                |
-| **empty_prompt_clean.csv**, **empty_response_a_clean.csv**, **empty_response_b_clean.csv** | `reports/clean/` | Registros vacíos detectados por columna (solo si existen).                  |
+Esto ayuda a detectar sesgos en el texto o posibles problemas de truncado que podrían afectar al modelo.
 
-## 5. Interpretación de los principales reportes
+**Encabezados:**
 
-### `describe.csv`
-
-Contiene métricas estadísticas o de frecuencia para cada columna:
-
-| Tipo de dato       | Métricas                                                  | Descripción                                                                |
-| ------------------ | --------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Numérico           | `count`, `mean`, `std`, `min`, `25%`, `50%`, `75%`, `max` | resumen estadístico de valores numéricos                                   |
-| Categórico / texto | `count`, `unique`, `top`, `freq`                          | cantidad de registros, valores únicos, valor más frecuente y su frecuencia |
-| Binario            | `mean` ≈ proporción de valores 1                          |                                                                            |
-
-Ejemplo:
-
-- `winner_model_a`, `winner_model_b`, `winner_tie` tienen medias ~0.34, 0.34 y 0.31, lo que muestra un balance casi perfecto.
-- `prompt_len`, `respA_len`, `respB_len` reflejan longitudes promedio (≈35, 133 y 134 palabras).
-
-### `na_overview.csv`
-
-Muestra cuántos valores nulos tiene cada columna y su porcentaje relativo.
-Sirve para verificar la integridad y calidad del dataset.
-
-### `length_stats.csv`
-
-Ayuda a decidir los límites de truncado:
-
-- `max_len_prompt` ≈ 128 tokens
-- `max_len_response` ≈ 512–640 tokens
-
-## 6. Conclusión
-
-El módulo **`01_data_cleaning`** automatiza la preparación completa de los datos:
-limpieza, imputación, normalización, balanceo y resumen estadístico.
-
-Después de ejecutar:
-
-```bash
-./scripts/00_setup-environment.sh
-./scripts/01_cleaning-data.sh
-./scripts/01-2_summary-data.sh
+```csv
+label, mean_prompt_len, mean_respA_len, mean_respB_len, std_prompt_len, std_respA_len, std_respB_len
 ```
 
-se obtiene un conjunto de datos estandarizado y trazable, listo para los módulos de entrenamiento y evaluación posteriores.
+#### 3. `ab_similarity_train.csv` / `ab_similarity_valid.csv`
+
+Calcula la **similitud entre las respuestas A y B** de cada prompt, usando métricas como `cosine_tfidf` y `jaccard_tokens`.
+El objetivo es entender **qué tan diferentes son las dos respuestas comparadas**:
+
+- Si la similitud es alta, puede indicar ejemplos redundantes o poco informativos.
+- Si es muy baja, las respuestas son más diversas y útiles para entrenamiento.
+
+**Encabezados:**
+
+```csv
+cosine_tfidf, jaccard_tokens, split, prompt_sig
+```
+
+#### 4. `near_duplicates_ab.csv`
+
+Lista los **pares de respuestas A/B casi idénticos** (similitud ≥ 0.95).
+Este reporte existe para **detectar ruido o duplicados residuales** que podrían afectar la diversidad del conjunto.
+
+Su revisión permite decidir si se deben eliminar o mantener ciertos pares.
+Es una verificación de calidad final sobre la limpieza textual.
+
+#### 5. `truncation_impact_train_valid.csv`
+
+Analiza el **impacto del truncado teórico** de prompts y respuestas a una longitud máxima fija (por ejemplo, 512 tokens).
+Sirve para **evaluar si se están perdiendo partes relevantes del texto** y si los límites definidos son adecuados.
+
+**Encabezados:**
+
+```csv
+split, %prompt_truncated, %respA_truncated, %respB_truncated
+```
+
+Un porcentaje alto indica que muchas muestras fueron recortadas y se debería revisar el límite.
+
+#### 6. `truncation_impact_train_valid_real.csv`
+
+Mismo análisis que el anterior, pero usando el **presupuesto real de tokens** que se aplicará en el modelo (con límites dinámicos).
+Este es el **indicador más realista del impacto del truncado** durante el entrenamiento.
+Permite anticipar pérdidas de contexto o desequilibrios en el largo de los textos.
+
+#### 7. `sample_texts_train_valid.csv`
+
+Contiene una **muestra aleatoria representativa** de los ejemplos de *train* y *valid*.
+Se usa para **inspección manual**, con el fin de verificar que las respuestas limpias mantengan sentido, coherencia y formato esperado.
+
+**Encabezados:**
+
+```csv
+split, prompt_clean, response_a_clean, response_b_clean, winner
+```
+
+Ideal para revisión rápida antes de entrenar el modelo o para validar la calidad subjetiva de las respuestas.
+
+#### 8. `00_analisis.log`
+
+Archivo de texto con el **resumen narrativo del análisis completo**.
+Incluye:
+
+- Resultados de balance de clases.
+- Impactos de truncado teórico y real.
+- Duplicados detectados.
+- Notas adicionales o umbrales usados.
+
+Funciona como un **registro de auditoría legible** del proceso de limpieza y análisis, útil para seguimiento de versiones o validación ante terceros.
+
+### En resumen
+
+| Archivo                        | Propósito principal                    |
+| ------------------------------ | -------------------------------------- |
+| `data_clean.csv`               | Dataset limpio y base para splits      |
+| `train_strat.csv`              | Dataset final usado para entrenamiento |
+| `valid_strat.csv`              | Dataset final de validación            |
+| `split_meta.json`              | Metadatos del proceso y umbrales       |
+| `class_balance_detail.csv`     | Balance de clases por conjunto         |
+| `length_by_class_*.csv`        | Longitud promedio por clase            |
+| `ab_similarity_*.csv`          | Similitud A vs B                       |
+| `near_duplicates_ab.csv`       | Pares casi duplicados                  |
+| `truncation_impact_*.csv`      | Efecto del truncado                    |
+| `sample_texts_train_valid.csv` | Ejemplos de revisión                   |
+| `00_analisis.log`              | Log final de auditoría                 |
