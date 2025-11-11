@@ -1,0 +1,16 @@
+# Evita copiar basura al build context (no excluimos reports/results/data/images)
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+.env
+.venv
+.vscode
+.idea
+node_modules/
+dist/
+build/
+.cache/
+.DS_Store
