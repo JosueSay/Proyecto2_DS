@@ -35,9 +35,9 @@ models:
     results_dir: "results/roberta"
     reports_dir: "reports/roberta"
   electra:
-    enabled: false
-    results_dir: "results/electra"     # reservado
-    reports_dir: "reports/electra"     # reservado
+    enabled: true
+    results_dir: "results/electra"
+    reports_dir: "reports/electra"
 
 runs:
   prefix: "run_"
