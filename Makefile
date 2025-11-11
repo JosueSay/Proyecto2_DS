@@ -3,6 +3,7 @@ CLEAN_SCRIPT = 01_data_cleaning/clean_data.py
 SUMMARY_SCRIPT = 01_data_cleaning/data_summary.py
 EDA_SCRIPT = 02_eda/eda_orchestrator.py
 EDA_ANALYSIS_SCRIPT = 02_eda/eda_analysis_orchestrator.py
+METRICS_SCRIPT = 03_metrics/compare_models.py
 
 # colores
 BLUE := \033[1;34m
@@ -111,6 +112,25 @@ eda_analysis:
 		exit 1; \
 	fi
 
+# metricas despues del entrenamiento
+metrics:
+	@echo "$(BLUE)$(BOLD)📊 Generando gráficas comparativas de modelos...$(RESET)"
+	@echo "\t- Script:       $(YELLOW)03_metrics/compare_models.py$(RESET)"
+	@echo "\t- Salida:       $(YELLOW)images/resultados$(RESET)"
+	@TMP=$$(mktemp); \
+	PYTHONPATH=. $(PYTHON) -m 03_metrics.compare_models > $$TMP 2>&1; \
+	PY_EXIT_CODE=$$?; PY_OUTPUT=$$(cat $$TMP); rm -f $$TMP; \
+	if [ $$PY_EXIT_CODE -ne 0 ]; then \
+		echo "$(RED)❌ Error al generar las gráficas$(RESET)"; \
+		echo ""; echo "$$PY_OUTPUT"; echo ""; \
+		exit 1; \
+	elif echo "$$PY_OUTPUT" | grep -qi "gráficas generadas en"; then \
+		echo "$(GREEN)✅ Gráficas generadas correctamente$(RESET)\n"; \
+		echo "\tRevisa: $(YELLOW)images/resultados$(RESET)"; \
+	else \
+		echo "$(YELLOW)ℹ️  Ejecución finalizada (revisa la carpeta de salida)$(RESET)\n"; \
+	fi
+
 # Limpieza total
 clean:
 	@echo "$(BLUE)$(BOLD)🧹 Limpiando artefactos generados...$(RESET)"
@@ -125,4 +145,4 @@ clean:
 	@echo "$(GREEN)✅ Limpieza completada$(RESET)"
 	@echo ""
 
-.PHONY: all clean_data summary eda eda_analysis clean
+.PHONY: all clean_data summary eda eda_analysis clean metrics
