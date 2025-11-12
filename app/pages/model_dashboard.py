@@ -86,7 +86,7 @@ elif selected == "Curvas (epochs)":
         ep = r["epochs"]
         if ep is not None and not ep.empty:
             ch = lineChartEpochs(ep, title=r["model"])
-            st.altair_chart(ch, use_container_width=True)
+            st.altair_chart(ch, width=True)
         else:
             st.info(f"{r['model']}: Sin epochs.csv")
 
@@ -111,7 +111,7 @@ elif selected == "Distribuciones de predicciones":
             # usa la columna numérica más relevante (prob o la primera)
             col = "prob" if "prob" in pdist.columns else pdist.select_dtypes("number").columns.tolist()[0]
             ch = distChart(pdist, col, title=f"{r['model']} · {col}")
-            st.altair_chart(ch, use_container_width=True)
+            st.altair_chart(ch, width=True)
         else:
             st.info(f"{r['model']}: Sin pred_distributions.csv")
 
@@ -125,8 +125,8 @@ elif selected == "Métricas por clase":
             y = "f1-score" if "f1-score" in cr.columns else cr.select_dtypes("number").columns.tolist()[0]
             x = "class" if "class" in cr.columns else cr.columns[0]
             ch = barsChart(cr, x=x, y=y, title=f"{r['model']} · {y}")
-            st.altair_chart(ch, use_container_width=True)
-            st.dataframe(cr, use_container_width=True)
+            st.altair_chart(ch, width=True)
+            st.dataframe(cr, width=True)
         else:
             st.info(f"{r['model']}: Sin class_report.csv")
 
@@ -165,6 +165,6 @@ elif selected in ["Val Accuracy", "Macro F1", "Val Loss"]:
             .properties(title=f"Comparativa {selected} entre modelos")
             .interactive()
         )
-        st.altair_chart(chart, use_container_width=True)
+        st.altair_chart(chart, width=True)
     else:
         st.info(f"No hay datos disponibles para {selected}.")
