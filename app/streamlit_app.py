@@ -12,7 +12,9 @@ from utils.cleaning import cleanBatch
 from utils.charts import lineChartEpochs
 from components.metric_cards import showMetricCards
 
-# config inicial de la app
+# ===============================
+# CONFIGURACIÓN INICIAL DE LA APP
+# ===============================
 cfg = getAppConfig()
 st.set_page_config(
     page_title=cfg["app"]["title"],
@@ -21,21 +23,45 @@ st.set_page_config(
 )
 applyGlobalTheme()
 
-# aplica estilos personalizados si existen
+# ===============================
+# APLICAR ESTILOS CORPORATIVOS
+# ===============================
 css_path = repoPath("app", "assets", "styles.css")
 if css_path.exists():
     st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
-# inicia variables de sesión streamlit
+# ===============================
+# ENCABEZADO FIJO CON LOGO
+# ===============================
+logo_path = cfg["app"]["favicon"]
+header_html = f"""
+<header>
+    <img src="{logo_path}" alt="Logo">
+    <h1>{cfg["app"]["title"]}</h1>
+</header>
+<div class="main-content">
+"""
+st.markdown(header_html, unsafe_allow_html=True)
+
+# ===============================
+# INICIALIZACIÓN DE SESIÓN
+# ===============================
 initSession()
 
-# título principal
+# ===============================
+# CONTENIDO PRINCIPAL
+# ===============================
 st.title(f'🧭 {cfg["app"]["title"]}')
 st.caption(f'Dispositivo: **{getDevice()}**')
 
-# pestañas principales de la app
-tab_overview, tab_models, tab_clean, tab_charts = st.tabs(["**Overview**", "**Modelos**", "**Limpieza de datos**", "**Gráficas (mejor modelo)**"])
+# Pestañas principales
+tab_overview, tab_models, tab_clean, tab_charts = st.tabs(
+    ["**Overview**", "**Modelos**", "**Limpieza de datos**", "**Gráficas (mejor modelo)**"]
+)
 
+# ===============================
+# OVERVIEW
+# ===============================
 with tab_overview:
     st.subheader("Problemática: Sintaxis de archivos CSV")
     st.markdown("""
@@ -49,6 +75,9 @@ with tab_overview:
     st.markdown("### Carga de datos")
     st.write("Sube un archivo CSV que contenga las columnas: `id`, `prompt`, `response_a`, `response_b`")
 
+# ===============================
+# MODELOS
+# ===============================
 with tab_models:
     st.subheader("Estado de modelos")
     models = getEnabledModels()
@@ -56,7 +85,6 @@ with tab_models:
 
     col_l, col_r = st.columns([1, 2])
     with col_l:
-        # selector de modelo activo
         model = st.selectbox("Modelo", models, index=0 if models else None, key="model_select")
         setSelection(model=model)
 
@@ -66,7 +94,6 @@ with tab_models:
             latest_name = latest["name"] if latest else "—"
             st.metric("Última corrida", latest_name)
 
-            # muestra el catálogo de ejecuciones del modelo
             rows = [
                 {
                     "run": r["name"],
@@ -83,6 +110,9 @@ with tab_models:
         else:
             st.warning("no hay modelos habilitados en `app_config.yaml`.")
 
+# ===============================
+# LIMPIEZA DE DATOS
+# ===============================
 with tab_clean:
     st.subheader("Limpieza de CSVs de pares")
     col_a, col_b = st.columns([1, 2])
@@ -90,7 +120,6 @@ with tab_clean:
 
     with col_a:
         st.markdown("**Entrada**")
-        # permite usar archivo de ejemplo o subir uno propio
         if st.button("Usar **data/test.csv**"):
             up = open(os.path.join(repoRoot(), "data", "test.csv"), "rb")
         else:
@@ -100,11 +129,8 @@ with tab_clean:
         st.markdown("**Salida (limpia)**")
         if up:
             try:
-                # lee y limpia el csv
                 df = pd.read_csv(up)
                 df_clean = cleanBatch(df)
-
-                # muestra vista previa y botón para descargar
                 st.dataframe(df_clean.head(50), width="stretch")
                 st.download_button(
                     "descargar limpio",
@@ -117,6 +143,9 @@ with tab_clean:
         else:
             st.info("Sube un CSV o usa el botón para probar con `data/test.csv`.")
 
+# ===============================
+# GRÁFICAS DEL MEJOR MODELO
+# ===============================
 with tab_charts:
     cfg = getAppConfig()
     model = st.session_state.get("selected_model")
@@ -126,7 +155,6 @@ with tab_charts:
     else:
         latest = getLatestRun(model, cfg)
 
-        # valida que haya reportes para el modelo
         if not latest or not latest["reports_dir"]:
             st.warning("no hay reports para el último run")
         else:
@@ -134,18 +162,23 @@ with tab_charts:
             if not epochs_path.exists():
                 st.warning(f"no existe {epochs_path}")
             else:
-                # carga métricas por epoch
                 df_epochs = pd.read_csv(epochs_path)
-
-                # obtiene última fila con métricas válidas
                 last = df_epochs.dropna(subset=["val_acc", "macro_f1"], how="all").tail(1)
                 acc = float(last["val_acc"].iloc[0]) if "val_acc" in last.columns and not last["val_acc"].isna().all() else None
                 f1m = float(last["macro_f1"].iloc[0]) if "macro_f1" in last.columns and not last["macro_f1"].isna().all() else None
                 vloss = float(last["val_loss"].iloc[0]) if "val_loss" in last.columns and not last["val_loss"].isna().all() else None
 
-                # muestra tarjetas de métricas
                 showMetricCards(acc, f1m, vloss)
 
-                # renderiza gráfica de entrenamiento
                 chart = lineChartEpochs(df_epochs, title=f"{model} · epochs.csv")
-                st.altair_chart(chart, width='stretch')
+                st.altair_chart(chart, use_container_width=True)
+
+# ===============================
+# FOOTER CORPORATIVO
+# ===============================
+st.markdown("""
+<footer>
+    © 2025 | Dashboard Empresarial — Proyecto de Ciencia de Datos
+</footer>
+</div>
+""", unsafe_allow_html=True)

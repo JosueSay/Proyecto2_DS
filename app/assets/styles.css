@@ -1,39 +1,143 @@
-/* app/assets/styles.css */
-:root{
-  --c-primary:#1B3B5F;
-  --c-secondary:#2E5984;
-  --c-mid:#5C7EA3;
-  --c-neutral:#B0BEC5;
-  --c-accent:#F28C38;
-  --c-success:#3D8361;
-  --c-danger:#C14953;
-  --c-bg:#F7F9FC;
+/* ===============================
+   CORPORATE DASHBOARD THEME
+   Azul-Gris — Modo claro/oscuro automático
+   =============================== */
+
+/* Tipografía y estructura general */
+html, body {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-/* fondo general */
-.stApp, .block-container{ background: var(--c-bg) !important; }
-
-/* títulos */
-h1, h2, h3, h4{ color: var(--c-primary) !important; }
-
-/* tabs (marcado) */
-[role="tab"][aria-selected="true"]{
-  border-bottom: 2px solid var(--c-secondary) !important;
+/* Paleta base */
+:root {
+  --primary-color: #1f3c88; /* azul corporativo */
+  --secondary-color: #4a5568; /* gris medio */
+  --accent-color: #007acc; /* azul brillante */
+  --bg-color: #f8f9fa; /* fondo claro */
+  --card-bg: #ffffff;
+  --text-color: #1a202c;
+  --border-color: #e2e8f0;
+  --shadow-color: rgba(0, 0, 0, 0.08);
 }
 
-/* botones primarios */
-.stButton>button{
-  background: var(--c-primary) !important;
+/* Modo oscuro automático */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #90cdf4;
+    --secondary-color: #a0aec0;
+    --accent-color: #63b3ed;
+    --bg-color: #1a202c;
+    --card-bg: #2d3748;
+    --text-color: #edf2f7;
+    --border-color: #4a5568;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Fondo general */
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* ===============================
+   HEADER FIJO
+   =============================== */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 6px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  z-index: 999;
+}
+
+header img {
+  height: 36px;
+  width: 36px;
+  margin-right: 12px;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  color: var(--primary-color);
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ===============================
+   CONTENEDOR PRINCIPAL
+   =============================== */
+.main-content {
+  margin-top: 80px;
+  padding: 1.5rem 2rem;
+}
+
+.stApp {
+  background-color: var(--bg-color);
+}
+
+/* ===============================
+   TARJETAS Y SECCIONES
+   =============================== */
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+/* ===============================
+   BOTONES
+   =============================== */
+button, .stButton>button {
+  background-color: var(--primary-color) !important;
   color: #fff !important;
-  border: 0 !important;
-}
-.stButton>button:hover{ filter: brightness(0.95); }
-
-/* tablas: borde sutil */
-[data-testid="stDataFrame"]{
-  border: 1px solid var(--c-neutral);
-  border-radius: 8px;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 1rem !important;
+  transition: background-color 0.2s ease;
 }
 
-/* métricas */
-[data-testid="stMetricValue"]{ color: var(--c-primary) !important; }
+button:hover, .stButton>button:hover {
+  background-color: var(--accent-color) !important;
+}
+
+/* ===============================
+   GRÁFICAS Y SECCIONES
+   =============================== */
+.stPlotlyChart, .stAltairChart, .stVegaLiteChart {
+  border-radius: 12px;
+  background-color: var(--card-bg);
+  box-shadow: 0 1px 4px var(--shadow-color);
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+/* ===============================
+   FOOTER
+   =============================== */
+footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: var(--secondary-color);
+  border-top: 1px solid var(--border-color);
+  margin-top: 2rem;
+}
